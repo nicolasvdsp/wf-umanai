@@ -58,7 +58,7 @@ No manual toggles. No changes needed between development and production.
    ```bash
    npm run dev
    ```
-   This starts Vite on `localhost:3011`.
+   This starts Vite on `localhost:3012`.
 
 2. **Open your Webflow staging site** (`your-project.webflow.io`)
 
@@ -87,7 +87,7 @@ export const INCLUDE_FEATURES = {
 
 ## 6. Dev Server Port
 
-The dev server port (`3011`) is configured in two places:
+The dev server port (`3012`) is configured in two places:
 - `src/loader.js` → `DEV_PORT`
 - `vite.config.js` → `server.port`
 

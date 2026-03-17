@@ -19,7 +19,7 @@
   // CONFIGURATION — Update these per project
   // ============================================
   const NETLIFY_URL = 'https://MY-PROJECT.netlify.app';
-  const LOCAL_PORT = 3011;
+  const LOCAL_PORT = 3012;
   const FORCE_REFRESH_VERSION = '1.0.0';
 
   // ============================================

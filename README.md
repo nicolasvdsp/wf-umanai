@@ -40,7 +40,7 @@ A modern, scalable template for adding custom JavaScript to Webflow projects usi
 
 | Command | Description |
 |---|---|
-| `npm run dev` | Start dev server with HMR (port 3011) |
+| `npm run dev` | Start dev server with HMR (port 3012) |
 | `npm run build` | Build `main.js` + `main.min.js` to `dist/` |
 | `npm run preview` | Preview production build locally |
 | `npm run clean` | Clean dist folder |
