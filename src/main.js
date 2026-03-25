@@ -18,7 +18,7 @@ import parallax from './features/parallax';
 import microInteractions from './features/micro-interactions';
 import faq from './features/faq';
 import utilities from './features/utilities';
-
+import services from './features/services';
 
 // ============================================
 // START
@@ -48,6 +48,7 @@ function runApp() {
     ACTIVE_FEATURES.microInteractions && microInteractions();
     ACTIVE_FEATURES.faq && faq();
     ACTIVE_FEATURES.utilities && utilities();
+    ACTIVE_FEATURES.services && services();
   }
 
   if (document.readyState === 'loading') {
