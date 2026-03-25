@@ -22,4 +22,5 @@ export const INCLUDE_FEATURES = {
   vimeoAdvanced: true,
   utilities: true,
   services: true,
+  testimonials: true,
 }

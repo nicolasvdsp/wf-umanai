@@ -19,6 +19,7 @@ import microInteractions from './features/micro-interactions';
 import faq from './features/faq';
 import utilities from './features/utilities';
 import services from './features/services';
+import testimonials from './features/testimonials';
 
 // ============================================
 // START
@@ -49,6 +50,7 @@ function runApp() {
     ACTIVE_FEATURES.faq && faq();
     ACTIVE_FEATURES.utilities && utilities();
     ACTIVE_FEATURES.services && services();
+    ACTIVE_FEATURES.testimonials && testimonials();
   }
 
   if (document.readyState === 'loading') {
