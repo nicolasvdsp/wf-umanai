@@ -121,6 +121,41 @@ function initGlobalParallax(container) {
   )
 }
 
+function initSkew(container) {
+  container = container || document;
+  const els = container.querySelectorAll("[data-init-skew]");
+  if (!els.length) return;
+
+  els.forEach((el) => {
+    const skewYAmount = parseFloat(el.getAttribute("data-skewy-amount")) || .5;
+    const skewXAmount = parseFloat(el.getAttribute("data-skewx-amount")) || 5;
+    const yAmount = parseFloat(el.getAttribute("data-vertical-amount")) || 3;
+    const baseSkewX = parseFloat(el.getAttribute("data-base-skewx")) || -20;
+    const baseSkewY = parseFloat(el.getAttribute("data-base-skewy")) || 3;
+
+    gsap.fromTo(
+      el,
+      {
+        yPercent: yAmount * .5,
+        skewY: baseSkewY,
+        skewX: baseSkewX,
+      },
+      {
+        yPercent: yAmount * 2,
+        skewY: baseSkewY + skewYAmount,
+        skewX: baseSkewX - skewXAmount,
+        ease: "none",
+        scrollTrigger: {
+          trigger: el,
+          start: "clamp(top center)",
+          end: "clamp(bottom top)",
+          scrub: true,
+        },
+      }
+    );
+  });
+}
+
 function initFooterParallax(container) {
   container = container || document;
   const init = container.querySelectorAll('[data-footer-parallax]');
@@ -159,6 +194,7 @@ function parallax() {
   document.addEventListener("barba:afterEnter", (e) => {
     initStackingCardsParallax(e.detail.container);
     initGlobalParallax(e.detail.container);
+    initSkew(e.detail.container);
     initFooterParallax(e.detail.container);
   });
 }
