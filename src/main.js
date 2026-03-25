@@ -1,8 +1,9 @@
-// import './scss/app.scss';
+import './scss/app.scss';
 import { INCLUDE_FEATURES } from './config';
 import { detectAndRun } from './loader';
 
 import pageTransitions from './features/page-transitions/page-transitions';
+import navbar from './features/navbar';
 import customFeature from './features/custom-feature';
 import animations from './features/animations/animations';
 import scrollBehaviour from './features/scroll-behaviour/scroll-behaviour';
@@ -18,6 +19,7 @@ import microInteractions from './features/micro-interactions';
 import faq from './features/faq';
 import utilities from './features/utilities';
 
+
 // ============================================
 // START
 // ============================================
@@ -31,6 +33,7 @@ function runApp() {
 
   function initFeatures() {
     ACTIVE_FEATURES.pageTransitions && pageTransitions();
+    ACTIVE_FEATURES.navbar && navbar();
     ACTIVE_FEATURES.customFeature && customFeature();
     ACTIVE_FEATURES.animations && animations();
     ACTIVE_FEATURES.scrollBehaviour && scrollBehaviour();
