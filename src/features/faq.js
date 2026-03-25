@@ -1,6 +1,6 @@
 function initAccordionCSS(container) {
   container = container || document;
-  const accordions = document.querySelectorAll('[data-accordion-css-init]');
+  const accordions = container.querySelectorAll('[data-accordion-css-init]');
   if (!accordions.length) return;
 
   accordions.forEach((accordion) => {
