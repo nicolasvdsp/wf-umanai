@@ -2,12 +2,12 @@ function initMegaNavDirectionalHover() {
   const DUR = {
     bgMorph: 0.4,
     contentIn: 0.3,
-    contentOut: 0.2,
+    contentOut: 0.3,
     stagger: 0.25,
     backdropIn: 0.3,
-    backdropOut: 0.2,
+    backdropOut: 0.3,
     openScale: 0.35,
-    closeScale: 0.25,
+    closeScale: 0.35,
   };
 
   const HOVER_ENTER = 120;
@@ -543,6 +543,11 @@ function initMegaNavDirectionalHover() {
   burger.addEventListener("click", () => state.mobileMenuOpen ? closeMobileMenu() : openMobileMenu());
   backBtn.addEventListener("click", closeMobilePanel);
   window.addEventListener("resize", handleResize);
+
+  document.addEventListener("navbar:close", () => {
+    if (state.isMobile && state.mobileMenuOpen) closeMobileMenu();
+    else if (state.isOpen) closeDropdown();
+  });
 
   // INIT
   state.isMobile ? setupMobile() : resetDesktop();

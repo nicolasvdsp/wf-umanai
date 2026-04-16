@@ -429,7 +429,8 @@ function initPageTransitions() {
     addElementReveals(tl, next, "pageReady+=0.2");
     // ------------tl_end----------------
 
-    tl.call(resetPage, [next], "pageReady");
+    tl.call(slideBannerIn, null, "pageReady=-0.2");
+    tl.call(resetPage, [next], "pageReady=+.2");
 
     return new Promise(resolve => {
       tl.call(resolve, null, "pageReady");
@@ -441,6 +442,8 @@ function initPageTransitions() {
     // -----------VARIABLES--------------
 
     // ------------var_end---------------
+
+    document.dispatchEvent(new CustomEvent("navbar:close"));
 
     const tl = gsap.timeline({
       onComplete: () => { current.remove() }
@@ -497,7 +500,8 @@ function initPageTransitions() {
     addElementReveals(tl, next, "pageReady+=0.2");
     // ------------tl_end----------------
 
-    tl.call(resetPage, [next], "pageReady");
+    tl.call(slideBannerIn, null, "pageReady=-.2");
+    tl.call(resetPage, [next], "pageReady=+0.2");
 
     return new Promise(resolve => {
       tl.call(resolve, null, "pageReady");
@@ -592,6 +596,7 @@ function initPageTransitions() {
     addElementReveals(tl, next, "pageReady-=0");
     // ------------tl_end----------------
 
+    tl.call(slideBannerIn, null, "pageReady-=0.5");
     tl.call(resetPage, [next], "pageReady");
 
     return new Promise(resolve => {
@@ -685,6 +690,7 @@ function initPageTransitions() {
     // ------------tl_end----------------
 
 
+    tl.call(slideBannerIn, null, "pageReady-=0.5");
     tl.call(resetPage, [next], "pageReady");
     tl.call(() => {
       flippedThumbnail = null;
@@ -702,19 +708,24 @@ function initPageTransitions() {
   // BARBA HOOKS + INIT
   // -----------------------------------------
 
+  let leavingContainer = null;
+
   barba.hooks.beforeEnter(data => {
-    // Position new container on top
-    //const navBottom = document.querySelector('.navbar_component')?.getBoundingClientRect().bottom || 0;
+    if (lenis) lenis.stop();
+
+    leavingContainer = data.current?.container !== data.next?.container
+      ? data.current?.container
+      : null;
+
+    const navBottom =
+      document.querySelector('.mega-nav')?.getBoundingClientRect().bottom || 0;
+
     gsap.set(data.next.container, {
       position: "fixed",
-      top: 0,
+      top: navBottom,
       left: 0,
       right: 0,
     });
-
-    if (lenis) {
-      lenis.stop();
-    }
 
     initBeforeEnterFunctions(data.next.container);
     applyThemeFrom(data.next.container);
@@ -772,8 +783,8 @@ function initPageTransitions() {
           return enterDetailFromItemTransition(data.next.container);
         }
       },
-      { //parallax over
-        name: "parallax over",
+      { //crossfade
+        name: "crossfade",
         custom: () => true,
         sync: true,
 
@@ -786,12 +797,12 @@ function initPageTransitions() {
 
         // Current page leaves
         async leave(data) {
-          return pageLeaveParallaxOver(data.current.container, data.next.container);
+          return pageLeaveCrossFade(data.current.container, data.next.container);
         },
 
         // New page enters
         async enter(data) {
-          return pageEnterParallaxOver(data.next.container);
+          return pageEnterCrossFade(data.next.container);
         }
       },
       { //self
@@ -816,8 +827,8 @@ function initPageTransitions() {
           return runPageEnterSelf(data.next.container);
         }
       },
-      { //crossfade
-        name: "crossfade",
+      { //parallax over
+        name: "parallax over",
         custom: () => false,
         sync: true,
 
@@ -830,14 +841,14 @@ function initPageTransitions() {
 
         // Current page leaves
         async leave(data) {
-          return pageLeaveCrossFade(data.current.container, data.next.container);
+          return pageLeaveParallaxOver(data.current.container, data.next.container);
         },
 
         // New page enters
         async enter(data) {
-          return pageEnterCrossFade(data.next.container);
+          return pageEnterParallaxOver(data.next.container);
         }
-      }
+      },
 
     ],
   });
@@ -900,6 +911,40 @@ function initPageTransitions() {
     gsap.ticker.lagSmoothing(0);
   }
 
+  function slideBannerIn() {
+    const scrollY = window.scrollY || 0;
+    const banner = document.querySelector('.banner_component');
+    const nav = document.querySelector('.mega-nav');
+    const bannerH = banner?.offsetHeight || 0;
+    const shift = Math.min(scrollY, bannerH);
+
+    if (shift > 1) {
+      if (leavingContainer) {
+        const oldTop = leavingContainer.getBoundingClientRect().top;
+        gsap.set(leavingContainer, {
+          position: "fixed",
+          top: oldTop,
+          left: 0,
+          right: 0,
+        });
+      }
+
+      window.scrollTo(0, 0);
+      const targets = [banner, nav].filter(Boolean);
+      gsap.set(targets, { y: -shift });
+      gsap.to(targets, {
+        y: 0,
+        duration: 0.3,
+        onComplete() {
+          gsap.set(targets, { clearProps: "transform" });
+          if (hasScrollTrigger) ScrollTrigger.refresh();
+        }
+      });
+    } else if (scrollY > 0) {
+      window.scrollTo(0, 0);
+    }
+  }
+
   function resetPage(container) {
     window.scrollTo(0, 0);
     gsap.set(container, { clearProps: "position,top,left,right" });
@@ -952,6 +997,7 @@ function initPageTransitions() {
   // -----------------------------------------
   // YOUR FUNCTIONS GO BELOW HERE
   // -----------------------------------------
+
 
 
 }
