@@ -2,5 +2,6 @@
 @use 'components/lottie';
 @use 'components/breakpoints';
 @use 'components/touchdevice';
-I @use 'components/testimonials';
+@use 'components/testimonials';
 // @use 'components/richtext'; // moved to Webflow custom code
+@use 'components/cta';
