@@ -23,4 +23,5 @@ export const INCLUDE_FEATURES = {
   utilities: true,
   services: true,
   testimonials: true,
+  richtextFeatures: true,
 }

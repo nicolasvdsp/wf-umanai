@@ -20,6 +20,7 @@ import faq from './features/faq';
 import utilities from './features/utilities';
 import services from './features/services';
 import testimonials from './features/testimonials';
+import richtextFeatures from './features/richtext-features';
 
 // ============================================
 // START
@@ -51,6 +52,7 @@ function runApp() {
     ACTIVE_FEATURES.utilities && utilities();
     ACTIVE_FEATURES.services && services();
     ACTIVE_FEATURES.testimonials && testimonials();
+    ACTIVE_FEATURES.richtextFeatures && richtextFeatures();
   }
 
   if (document.readyState === 'loading') {
