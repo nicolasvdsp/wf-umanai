@@ -68,7 +68,7 @@ function initPageTransitions() {
     // if (has('[data-something]')) initSomething();
     // if (has('[data-overlap-slider-init]')) initOverlappingSlider();
 
-
+    reinitFsAttributes();
 
     if (lenis) {
       lenis.resize();
@@ -998,7 +998,19 @@ function initPageTransitions() {
   // YOUR FUNCTIONS GO BELOW HERE
   // -----------------------------------------
 
+  function reinitFsAttributes() {
+    // Attributes v2
+    if (window.FinsweetAttributes?.modules) {
+      Object.values(window.FinsweetAttributes.modules).forEach(m => m.restart?.());
+      return;
+    }
 
+    // Attributes v1 fallback
+    if (!window.fsAttributes) return;
+    ['cmsfilter', 'cmssort', 'cmsload', 'cmsnest', 'cmsprevnext', 'cmsselect'].forEach(attr => {
+      window.fsAttributes.push([attr, () => window.fsAttributes[attr]?.init?.()]);
+    });
+  }
 
 }
 
