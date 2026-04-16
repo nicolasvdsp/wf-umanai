@@ -1,0 +1,41 @@
+.cta_background-image-position {
+  transition: left .4s ease-out;
+}
+
+@media (max-width: 1220px) {
+  .cta_background-image-position {
+    left: 15%;
+  }
+}
+
+@media (max-width: 1140px) {
+  .cta_background-image-position {
+    left: 25%;
+  }
+}
+
+@media (max-width: 1140px) {
+  .cta_background-image-position {
+    left: 32%;
+  }
+}
+
+@media (max-width: 1055px) {
+  .cta_background-image-position {
+    left: 40%;
+  }
+}
+
+// @media (max-width: 991px) {
+//   .cta_background-image-position {
+//     left: 25%;
+//     transform: skewX(-10deg);
+//   }
+// }
+
+// @media (max-width: 767px) {
+//   .cta_background-image-position {
+//     left: 25%;
+//     transform: skewX(-10deg);
+//   }
+// }
