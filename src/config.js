@@ -26,4 +26,5 @@ export const INCLUDE_FEATURES = {
   richtextFeatures: true,
   lucideIcons: true,
   bunnyBackground: true,
+  bunnyLightbox: true,
 }
