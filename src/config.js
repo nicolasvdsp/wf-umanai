@@ -24,4 +24,5 @@ export const INCLUDE_FEATURES = {
   services: true,
   testimonials: true,
   richtextFeatures: true,
+  lucideIcons: true,
 }
