@@ -429,7 +429,6 @@ function initPageTransitions() {
     addElementReveals(tl, next, "pageReady+=0.2");
     // ------------tl_end----------------
 
-    tl.call(slideBannerIn, null, "pageReady=-0.2");
     tl.call(resetPage, [next], "pageReady=+.2");
 
     return new Promise(resolve => {
@@ -500,7 +499,6 @@ function initPageTransitions() {
     addElementReveals(tl, next, "pageReady+=0.2");
     // ------------tl_end----------------
 
-    tl.call(slideBannerIn, null, "pageReady=-.2");
     tl.call(resetPage, [next], "pageReady=+0.2");
 
     return new Promise(resolve => {
@@ -596,7 +594,6 @@ function initPageTransitions() {
     addElementReveals(tl, next, "pageReady-=0");
     // ------------tl_end----------------
 
-    tl.call(slideBannerIn, null, "pageReady-=0.5");
     tl.call(resetPage, [next], "pageReady");
 
     return new Promise(resolve => {
@@ -690,7 +687,6 @@ function initPageTransitions() {
     // ------------tl_end----------------
 
 
-    tl.call(slideBannerIn, null, "pageReady-=0.5");
     tl.call(resetPage, [next], "pageReady");
     tl.call(() => {
       flippedThumbnail = null;
@@ -709,16 +705,41 @@ function initPageTransitions() {
   // -----------------------------------------
 
   let leavingContainer = null;
+  let savedScrollY = 0;
 
   barba.hooks.beforeEnter(data => {
     if (lenis) lenis.stop();
+    savedScrollY = window.scrollY || 0;
 
     leavingContainer = data.current?.container !== data.next?.container
       ? data.current?.container
       : null;
 
-    const navBottom =
-      document.querySelector('.mega-nav')?.getBoundingClientRect().bottom || 0;
+    // Pin old container at its current visual position
+    if (leavingContainer) {
+      const oldTop = leavingContainer.getBoundingClientRect().top;
+      gsap.set(leavingContainer, {
+        position: "fixed",
+        top: oldTop,
+        left: 0,
+        right: 0,
+      });
+    }
+
+    // Scroll to 0 — invisible because old container is now pinned
+    window.scrollTo(0, 0);
+
+    // Shift banner/nav up so they stay in their "scrolled-away" position visually
+    const banner = document.querySelector('.banner_component');
+    const nav = document.querySelector('.mega-nav');
+    const bannerH = banner?.offsetHeight || 0;
+    const shift = Math.min(savedScrollY, bannerH);
+    if (shift > 0) {
+      gsap.set([banner, nav].filter(Boolean), { y: -shift });
+    }
+
+    // navBottom now reflects the visual position (with banner/nav shifted)
+    const navBottom = nav?.getBoundingClientRect().bottom || 0;
 
     gsap.set(data.next.container, {
       position: "fixed",
@@ -760,6 +781,10 @@ function initPageTransitions() {
     debug: true, // Set to 'false' in production
     timeout: 7000,
     preventRunning: true,
+    prevent: ({ el }) => {
+      if (el?.hash && el.pathname.replace(/\/$/, '') === window.location.pathname.replace(/\/$/, '')) return true;
+      return !!el?.closest('[fs-cmsfilter-clear], [fs-cmsfilter-element], [fs-cmssort-element], [fs-cmsfilter-field], [fs-list-element="clear"]');
+    },
     transitions: [
       { //item to detail page
         name: "item to detail page",
@@ -911,47 +936,37 @@ function initPageTransitions() {
     gsap.ticker.lagSmoothing(0);
   }
 
-  function slideBannerIn() {
-    const scrollY = window.scrollY || 0;
+  function resetPage(container) {
     const banner = document.querySelector('.banner_component');
     const nav = document.querySelector('.mega-nav');
     const bannerH = banner?.offsetHeight || 0;
-    const shift = Math.min(scrollY, bannerH);
+    const navH = nav?.offsetHeight || 0;
+    const shift = Math.min(savedScrollY, bannerH);
+
+    function settle() {
+      gsap.set(container, { clearProps: "position,top,left,right" });
+      if (hasScrollTrigger) ScrollTrigger.refresh();
+      if (lenis) {
+        lenis.resize();
+        lenis.start();
+      }
+    }
 
     if (shift > 1) {
-      if (leavingContainer) {
-        const oldTop = leavingContainer.getBoundingClientRect().top;
-        gsap.set(leavingContainer, {
-          position: "fixed",
-          top: oldTop,
-          left: 0,
-          right: 0,
-        });
-      }
-
-      window.scrollTo(0, 0);
       const targets = [banner, nav].filter(Boolean);
-      gsap.set(targets, { y: -shift });
-      gsap.to(targets, {
-        y: 0,
+      const finalTop = bannerH + navH;
+
+      gsap.to(targets, { y: 0, duration: 0.3 });
+      gsap.to(container, {
+        top: finalTop,
         duration: 0.3,
         onComplete() {
           gsap.set(targets, { clearProps: "transform" });
-          if (hasScrollTrigger) ScrollTrigger.refresh();
+          settle();
         }
       });
-    } else if (scrollY > 0) {
-      window.scrollTo(0, 0);
-    }
-  }
-
-  function resetPage(container) {
-    window.scrollTo(0, 0);
-    gsap.set(container, { clearProps: "position,top,left,right" });
-
-    if (lenis) {
-      lenis.resize();
-      lenis.start();
+    } else {
+      settle();
     }
   }
 
@@ -999,15 +1014,19 @@ function initPageTransitions() {
   // -----------------------------------------
 
   function reinitFsAttributes() {
+    const FA = window.FinsweetAttributes;
+
     // Attributes v2
-    if (window.FinsweetAttributes?.modules) {
-      Object.values(window.FinsweetAttributes.modules).forEach(m => m.restart?.());
+    if (FA?.modules) {
+      Object.values(FA.modules).forEach(m => {
+        try { m.restart?.(); } catch (_) {}
+      });
       return;
     }
 
     // Attributes v1 fallback
     if (!window.fsAttributes) return;
-    ['cmsfilter', 'cmssort', 'cmsload', 'cmsnest', 'cmsprevnext', 'cmsselect'].forEach(attr => {
+    ['cmsfilter', 'cmssort', 'cmsload', 'cmsnest', 'cmsprevnext', 'cmsselect', 'toc'].forEach(attr => {
       window.fsAttributes.push([attr, () => window.fsAttributes[attr]?.init?.()]);
     });
   }
