@@ -25,4 +25,5 @@ export const INCLUDE_FEATURES = {
   testimonials: true,
   richtextFeatures: true,
   lucideIcons: true,
+  bunnyBackground: true,
 }

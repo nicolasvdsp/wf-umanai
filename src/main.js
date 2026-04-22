@@ -22,6 +22,7 @@ import services from './features/services';
 import testimonials from './features/testimonials';
 import richtextFeatures from './features/richtext-features';
 import lucideIcons from './features/lucide-icons';
+import bunnyBackground from './features/videos/bunny-background';
 
 // ============================================
 // START
@@ -55,6 +56,7 @@ function runApp() {
     ACTIVE_FEATURES.testimonials && testimonials();
     ACTIVE_FEATURES.richtextFeatures && richtextFeatures();
     ACTIVE_FEATURES.lucideIcons && lucideIcons();
+    ACTIVE_FEATURES.bunnyBackground && bunnyBackground();
   }
 
   if (document.readyState === 'loading') {
