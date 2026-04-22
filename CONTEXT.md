@@ -114,13 +114,13 @@ Custom CSS that can't be done in Webflow UI goes in the relevant `_[component].s
 ## Key CSS Patterns
 
 - **`overflow: clip`** instead of `overflow: hidden` when sticky children are involved — `clip` doesn't create a scroll container so `position: sticky` on children is preserved
-- **SVG gradient fills**: Define a hidden inline SVG with `<defs>` as a Webflow Embed element. Use `width:0; height:0; display:block` — **do not use `overflow: hidden`** (breaks `url(#id)` gradient references in some browsers). Reference via `fill: url(#gradient-id)` in SCSS. Guard with `html:not(.wf-design-mode)` to prevent applying in Webflow Designer.
+- **SVG gradient fills**: Define a hidden inline SVG with `<defs>` as a Webflow Embed element. Use `width:0; height:0; display:block` — **do not use `overflow: hidden`** (breaks `url(#id)` gradient references in some browsers). Reference via `fill: url(#gradient-id)` in SCSS. Guard with `html:not(.wf-design-mode)` to prevent applying in Webflow Designer. Gradient IDs follow the naming convention `tab-icon-gradient-{name}` (e.g. `tab-icon-gradient-blue`, `tab-icon-gradient-pink`, `tab-icon-gradient-orange`, `tab-icon-gradient-none`).
 
 Example SVG defs embed:
 ```html
 <svg id="svg-defs" aria-hidden="true" style="position:absolute;width:0;height:0;display:block;">
   <defs>
-    <linearGradient id="gradient-blue" x1="1" y1="0" x2="0" y2="0.34" gradientUnits="objectBoundingBox">
+    <linearGradient id="tab-icon-gradient-blue" x1="1" y1="0" x2="0" y2="0.34" gradientUnits="objectBoundingBox">
       <stop offset="0%" stop-color="#0138FF"/>
       <stop offset="90%" stop-color="#0138FF" stop-opacity="0.4"/>
       <stop offset="100%" stop-color="#0138FF" stop-opacity="0.2"/>
@@ -132,7 +132,7 @@ Example SVG defs embed:
 Use `data-gradient-fill="blue"` on the wrapper element, then target in SCSS:
 ```scss
 html:not(.wf-design-mode) [data-gradient-fill="blue"] svg path {
-  fill: url(#gradient-blue);
+  fill: url(#tab-icon-gradient-blue);
 }
 ```
 
@@ -158,6 +158,9 @@ html:not(.wf-design-mode) [data-gradient-fill="blue"] svg path {
 | Vimeo advanced | `src/features/videos/vimeo-advanced.js` | |
 | Breakpoints | `src/features/breakpoints.js` | |
 | Utilities | `src/features/utilities.js` | |
+| Lucide icons | `src/features/lucide-icons.js` | CMS-driven icon swap with gradient stroke support |
+| Testimonials | `src/features/testimonials.js` | Auto-rotating tabs with CMS data |
+| Richtext features | `src/features/richtext-features.js` | |
 
 ---
 
