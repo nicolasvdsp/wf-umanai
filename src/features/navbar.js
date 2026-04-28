@@ -15,6 +15,7 @@ function initMegaNavDirectionalHover() {
 
   // DOM references
   const menuWrap = document.querySelector("[data-menu-wrap]");
+  const navBar = menuWrap?.querySelector(".mega-nav__bar");
   const navList = document.querySelector("[data-nav-list]");
   const dropWrapper = document.querySelector("[data-dropdown-wrapper]");
   const dropContainer = document.querySelector("[data-dropdown-container]");
@@ -107,6 +108,78 @@ function initMegaNavDirectionalHover() {
     gsap.set(logo, { autoAlpha: 1 });
     gsap.set(dropContainer, { clearProps: "height" });
     gsap.set(backdrop, { autoAlpha: 0 });
+  }
+
+  // Pin the mobile menu / dropdown wrapper to the bottom edge of the actual nav
+  // bar, so a sticky banner above the nav doesn't push content below the fold.
+  function applyMobileTopOffset() {
+    const ref = navBar || menuWrap;
+    if (!ref) return;
+    const top = Math.max(0, ref.getBoundingClientRect().bottom);
+    if (navList) navList.style.top = `${top}px`;
+    if (dropWrapper) dropWrapper.style.top = `${top}px`;
+  }
+
+  function clearMobileTopOffset() {
+    if (navList) navList.style.top = "";
+    if (dropWrapper) dropWrapper.style.top = "";
+  }
+
+  // Lock/unlock page scroll while the mobile menu is open.
+  //
+  // We can't simply set `body { overflow: hidden }`: that makes <body>
+  // non-scrollable, which breaks the `position: sticky` containing block of
+  // the nav (it would snap to its natural document position and scroll off-
+  // screen). And we can't switch the nav to `position: fixed` either —
+  // sticky reserves layout space, fixed does not, so the page below would
+  // jump up by the nav's height.
+  //
+  // Instead, we leave the layout untouched and block scroll via event
+  // listeners + Lenis. Events that originate inside the menu/dropdown still
+  // get through, so the menu remains scrollable internally if its content
+  // overflows.
+  const SCROLLABLE_INSIDE_MENU =
+    "[data-nav-list], [data-dropdown-wrapper], [data-dropdown-container], [data-nav-content]";
+
+  function preventOutsideScroll(e) {
+    if (e.target.closest && e.target.closest(SCROLLABLE_INSIDE_MENU)) return;
+    e.preventDefault();
+  }
+
+  const SCROLL_KEYS = new Set([
+    "ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " ", "Spacebar",
+  ]);
+
+  function preventScrollKeys(e) {
+    if (!SCROLL_KEYS.has(e.key)) return;
+    if (e.target.closest && e.target.closest(SCROLLABLE_INSIDE_MENU)) return;
+    const tag = (e.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || e.target.isContentEditable) return;
+    e.preventDefault();
+  }
+
+  let scrollLocked = false;
+
+  function lockScroll() {
+    if (scrollLocked) return;
+    scrollLocked = true;
+    window.addEventListener("wheel", preventOutsideScroll, { passive: false });
+    window.addEventListener("touchmove", preventOutsideScroll, { passive: false });
+    window.addEventListener("keydown", preventScrollKeys, false);
+    if (window.lenis && typeof window.lenis.stop === "function") {
+      window.lenis.stop();
+    }
+  }
+
+  function unlockScroll() {
+    if (!scrollLocked) return;
+    scrollLocked = false;
+    window.removeEventListener("wheel", preventOutsideScroll);
+    window.removeEventListener("touchmove", preventOutsideScroll);
+    window.removeEventListener("keydown", preventScrollKeys);
+    if (window.lenis && typeof window.lenis.start === "function") {
+      window.lenis.start();
+    }
   }
 
   function measurePanel(name) {
@@ -361,7 +434,8 @@ function initMegaNavDirectionalHover() {
     state.mobileMenuOpen = true;
     menuWrap.setAttribute("data-menu-open", "true");
     burger.setAttribute("aria-expanded", "true");
-    document.body.style.overflow = "hidden";
+    applyMobileTopOffset();
+    lockScroll();
 
     const items = getNavItems();
     const tl = gsap.timeline();
@@ -391,7 +465,8 @@ function initMegaNavDirectionalHover() {
 
     const tl = gsap.timeline({
       onComplete() {
-        document.body.style.overflow = "";
+        unlockScroll();
+        clearMobileTopOffset();
         state.mobileTl = null;
         setupMobile();
       },
@@ -513,7 +588,8 @@ function initMegaNavDirectionalHover() {
         burger.setAttribute("aria-expanded", "false");
         state.mobileMenuOpen = false;
         state.mobilePanelActive = null;
-        document.body.style.overflow = "";
+        unlockScroll();
+        clearMobileTopOffset();
         resetDesktop();
       }
       if (!was && state.isMobile) {
