@@ -24,6 +24,7 @@ import richtextFeatures from './features/richtext-features';
 import lucideIcons from './features/lucide-icons';
 import bunnyBackground from './features/videos/bunny-background';
 import bunnyLightbox from './features/videos/bunny-lightbox';
+import hubspot from './features/hubspot';
 
 // ============================================
 // START
@@ -59,6 +60,7 @@ function runApp() {
     ACTIVE_FEATURES.lucideIcons && lucideIcons();
     ACTIVE_FEATURES.bunnyBackground && bunnyBackground();
     ACTIVE_FEATURES.bunnyLightbox && bunnyLightbox();
+    ACTIVE_FEATURES.hubspot && hubspot();
   }
 
   if (document.readyState === 'loading') {

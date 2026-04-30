@@ -27,4 +27,5 @@ export const INCLUDE_FEATURES = {
   lucideIcons: true,
   bunnyBackground: true,
   bunnyLightbox: true,
+  hubspot: true,
 }
