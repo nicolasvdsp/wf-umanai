@@ -155,6 +155,35 @@ function initQuoteText(container) {
 }
 
 
+function initListCombine(container) {
+  container = container || document;
+
+  container.querySelectorAll('[data-combine-target]').forEach(target => {
+    const max = parseInt(target.getAttribute('data-combine-target'), 10) || Infinity;
+    const list = target.querySelector('.w-dyn-items') || target;
+    const currentCount = list.children.length;
+
+    if (currentCount >= max) return;
+
+    const sourceId = target.getAttribute('data-combine-source');
+    if (!sourceId) return;
+
+    const root = container === document ? document : container.ownerDocument;
+    const source = root.querySelector('[data-combine-id="' + sourceId + '"]');
+    if (!source) return;
+
+    const sourceList = source.querySelector('.w-dyn-items') || source;
+    const needed = max - currentCount;
+
+    for (let i = 0; i < needed && sourceList.children.length > 0; i++) {
+      list.appendChild(sourceList.children[0]);
+    }
+
+    source.remove();
+  });
+}
+
+
 function initSearchBar(container) {
   container = container || document;
 
@@ -182,6 +211,7 @@ function utilities() {
     initQuoteText(e.detail.container);
     initFilterDropdowns(e.detail.container);
     initCappedListStagger(e.detail.container);
+    initListCombine(e.detail.container);
     initSearchBar(e.detail.container);
   });
 }
