@@ -631,9 +631,26 @@ function initMegaNavDirectionalHover() {
 
 
 // Initialize Mega Navigation (Directional Hover)
+//
+// The mega-nav DOM lives outside [data-barba="container"], so it's persistent
+// across page transitions — re-initialising on every `barba:afterEnter` would
+// stack duplicate event listeners on the same buttons, which causes competing
+// GSAP timelines (each closure's `closeDropdown` racing the others) and
+// breaks the close animation. Init once on first ready and let the existing
+// `navbar:close` event handle dropdown state across navigations.
+let megaNavInited = false;
+
+function initOnce() {
+  if (megaNavInited) return;
+  megaNavInited = true;
+  initMegaNavDirectionalHover();
+}
+
 function navbar() {
-  document.addEventListener('barba:afterEnter', (e) => {
-    initMegaNavDirectionalHover(e.detail.container);
-  });
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initOnce, { once: true });
+  } else {
+    initOnce();
+  }
 }
 export default navbar;
