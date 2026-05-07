@@ -28,11 +28,16 @@ function setupTestimonial(component) {
   const templateLink = tabsNav.querySelector('.testimonial35_tab-link');
   if (!templatePane || !templateLink) return;
 
+  // Capture insertion anchors so cloned items go in the original position,
+  // preserving any siblings in the nav (e.g. data-testimonials-prev/next chevrons).
+  const paneInsertBefore = templatePane.nextSibling;
+  const linkInsertBefore = templateLink.nextSibling;
+
   const paneClone = templatePane.cloneNode(true);
   const linkClone = templateLink.cloneNode(true);
 
-  tabsContent.innerHTML = '';
-  tabsNav.innerHTML = '';
+  tabsContent.querySelectorAll('.testimonial35_tab-pane').forEach((el) => el.remove());
+  tabsNav.querySelectorAll('.testimonial35_tab-link').forEach((el) => el.remove());
 
   const links = [];
   const panes = [];
@@ -40,19 +45,20 @@ function setupTestimonial(component) {
   data.forEach((item) => {
     const link = linkClone.cloneNode(true);
     populateElement(link, item);
-    tabsNav.appendChild(link);
+    tabsNav.insertBefore(link, linkInsertBefore);
     links.push(link);
 
     const pane = paneClone.cloneNode(true);
     populateElement(pane, item);
-    tabsContent.appendChild(pane);
+    tabsContent.insertBefore(pane, paneInsertBefore);
     panes.push(pane);
   });
 
   // --- State & animation ---
-  ``
+
   let activeIndex = 0;
   let isAnimating = false;
+  let imagesReady = false;
   let autoplayTimer = null;
   const interval = parseInt(component.getAttribute('data-testimonials-interval'), 10) || 8000;
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -139,13 +145,58 @@ function setupTestimonial(component) {
     },
   };
 
-  function switchToTab(index) {
+  // The pane element often stretches to match its parent (flex/grid) so its
+  // offsetHeight isn't useful. Measure the inner card if present.
+  function getContentHeight(pane) {
+    const inner = pane.querySelector('.testimonial35_card') || pane.firstElementChild;
+    return (inner || pane).offsetHeight;
+  }
+
+  function animateHeight(outgoing, incoming) {
+    if (transition === 'none' || !imagesReady) return;
+    const fromHeight = getContentHeight(outgoing);
+    const toHeight = getContentHeight(incoming);
+    if (Math.abs(fromHeight - toHeight) < 2) return;
+
+    // When shrinking, delay the height tween so the outgoing content has time
+    // to fade/move out before the container collapses (otherwise it clips).
+    const isShrinking = toHeight < fromHeight;
+    const delay = isShrinking ? duration * 0.1 : 0;
+
+    gsap.killTweensOf(tabsContent);
+    gsap.fromTo(tabsContent,
+      { height: fromHeight },
+      {
+        height: toHeight,
+        duration,
+        ease,
+        delay,
+        onComplete: () => {
+          gsap.set(tabsContent, { clearProps: 'height' });
+        },
+      });
+  }
+
+  // Wait for all populated images to load before allowing height animation.
+  // Prevents flicker on the first transition when image dimensions are still unknown.
+  const allImages = [...tabsContent.querySelectorAll('img'), ...tabsNav.querySelectorAll('img')];
+  Promise.all(allImages.map((img) => {
+    if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
+    return new Promise((resolve) => {
+      img.addEventListener('load', resolve, { once: true });
+      img.addEventListener('error', resolve, { once: true });
+    });
+  })).then(() => { imagesReady = true; });
+
+  function switchToTab(index, explicitDirection) {
     if (index === activeIndex || isAnimating) return;
     isAnimating = true;
 
     const outgoing = panes[activeIndex];
     const incoming = panes[index];
-    const direction = index > activeIndex ? 1 : -1;
+    const direction = explicitDirection ?? (index > activeIndex ? 1 : -1);
+
+    animateHeight(outgoing, incoming);
 
     const animate = transitions[transition] || transitions['cross-fade'];
     animate(outgoing, incoming, direction);
@@ -163,13 +214,60 @@ function setupTestimonial(component) {
     });
   });
 
+  // --- Prev / Next controls (chevrons + swipe) ---
+
+  function goToPrev() {
+    switchToTab((activeIndex - 1 + panes.length) % panes.length, -1);
+    resetAutoplay();
+  }
+
+  function goToNext() {
+    switchToTab((activeIndex + 1) % panes.length, 1);
+    resetAutoplay();
+  }
+
+  // Delegate prev/next clicks on the component in CAPTURE phase so we
+  // intercept before the inner <a class="link-block"> triggers navigation
+  // and before Barba's document-level listener sees the event.
+  component.addEventListener('click', (e) => {
+    const target = e.target.closest('[data-testimonials-prev], [data-testimonials-next]');
+    if (!target || !component.contains(target)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (target.matches('[data-testimonials-prev]')) goToPrev();
+    else goToNext();
+  }, true);
+
+  // Swipe: horizontal drag past threshold on the content or nav area
+  let touchStartX = 0;
+  let touchStartY = 0;
+  const SWIPE_THRESHOLD = 50;
+
+  function onTouchStart(e) {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }
+
+  function onTouchEnd(e) {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    if (Math.abs(dx) < SWIPE_THRESHOLD || Math.abs(dx) < Math.abs(dy)) return;
+    if (dx < 0) goToNext();
+    else goToPrev();
+  }
+
+  [tabsContent, tabsNav].forEach((el) => {
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+  });
+
   // --- Auto-rotation ---
 
   function startAutoplay() {
     stopAutoplay();
     if (panes.length <= 1) return;
     autoplayTimer = setInterval(() => {
-      switchToTab((activeIndex + 1) % panes.length);
+      switchToTab((activeIndex + 1) % panes.length, 1);
     }, interval);
   }
 
@@ -239,12 +337,13 @@ function populateElement(container, data) {
   container.querySelectorAll('[data-image]').forEach((el) => {
     const value = data[el.getAttribute('data-image')];
     if (!value) return;
-    if (el.tagName === 'IMG') {
-      el.src = value;
-    } else {
-      const img = el.querySelector('img');
-      if (img) img.src = value;
-    }
+    const img = el.tagName === 'IMG' ? el : el.querySelector('img');
+    if (!img) return;
+    // Force eager loading so all panes' images are ready before the first
+    // transition — prevents height-measurement glitches when lazy-loaded
+    // images inside hidden panes haven't loaded yet.
+    img.loading = 'eager';
+    img.src = value;
   });
 }
 

@@ -3,7 +3,7 @@
 }
 
 // Hide the old Webflow Tabs widget (kept in Designer for reference)
-[data-testimonials] > .w-tabs {
+[data-testimonials]>.w-tabs {
   display: none;
 }
 
@@ -28,5 +28,22 @@
 
   &.is-active {
     opacity: 1;
+  }
+}
+
+// On mobile: only show the active tab (with its logo) —
+// navigation handled by swipe + optional chevron buttons.
+@media (max-width: 767px) {
+  [data-testimonials-nav] .testimonial35_tab-link:not(.is-active) {
+    display: none !important;
+  }
+
+  [data-testimonials-content],
+  [data-testimonials-nav] {
+    touch-action: pan-y;
+  }
+
+  .testimonial35_tab-link.is-active {
+    border-top: 0;
   }
 }
