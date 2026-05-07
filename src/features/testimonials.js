@@ -1,3 +1,6 @@
+// Module-level counter so each component gets unique tab/panel IDs across the page.
+let testimonialCounter = 0;
+
 function initTestimonials(container) {
   container = container || document;
 
@@ -28,6 +31,15 @@ function setupTestimonial(component) {
   const templateLink = tabsNav.querySelector('.testimonial35_tab-link');
   if (!templatePane || !templateLink) return;
 
+  // --- ARIA: component-level setup ---
+  const cid = ++testimonialCounter;
+  const idPrefix = `testimonial35-${cid}`;
+
+  setIfMissing(component, 'aria-roledescription', 'carousel');
+  setIfMissing(component, 'aria-label', 'Customer testimonials');
+  setIfMissing(tabsNav, 'role', 'tablist');
+  setIfMissing(tabsNav, 'aria-label', 'Choose testimonial');
+
   // Capture insertion anchors so cloned items go in the original position,
   // preserving any siblings in the nav (e.g. data-testimonials-prev/next chevrons).
   const paneInsertBefore = templatePane.nextSibling;
@@ -42,17 +54,37 @@ function setupTestimonial(component) {
   const links = [];
   const panes = [];
 
-  data.forEach((item) => {
+  data.forEach((item, i) => {
+    const tabId = `${idPrefix}-tab-${i}`;
+    const panelId = `${idPrefix}-panel-${i}`;
+    const isFirst = i === 0;
+
     const link = linkClone.cloneNode(true);
+    link.setAttribute('role', 'tab');
+    link.id = tabId;
+    link.setAttribute('aria-controls', panelId);
+    link.setAttribute('aria-selected', String(isFirst));
+    link.setAttribute('tabindex', isFirst ? '0' : '-1');
     populateElement(link, item);
     tabsNav.insertBefore(link, linkInsertBefore);
     links.push(link);
 
     const pane = paneClone.cloneNode(true);
+    pane.setAttribute('role', 'tabpanel');
+    pane.id = panelId;
+    pane.setAttribute('aria-labelledby', tabId);
+    pane.setAttribute('aria-roledescription', 'slide');
+    pane.setAttribute('aria-label', `${i + 1} of ${data.length}`);
     populateElement(pane, item);
     tabsContent.insertBefore(pane, paneInsertBefore);
     panes.push(pane);
   });
+
+  // ARIA on chevrons (defaults — user can override in Webflow with their own aria-label)
+  const prevControl = component.querySelector('[data-testimonials-prev]');
+  const nextControl = component.querySelector('[data-testimonials-next]');
+  if (prevControl) setIfMissing(prevControl, 'aria-label', 'Previous testimonial');
+  if (nextControl) setIfMissing(nextControl, 'aria-label', 'Next testimonial');
 
   // --- State & animation ---
 
@@ -196,6 +228,12 @@ function setupTestimonial(component) {
     const incoming = panes[index];
     const direction = explicitDirection ?? (index > activeIndex ? 1 : -1);
 
+    // ARIA state sync
+    links[activeIndex].setAttribute('aria-selected', 'false');
+    links[activeIndex].setAttribute('tabindex', '-1');
+    links[index].setAttribute('aria-selected', 'true');
+    links[index].setAttribute('tabindex', '0');
+
     animateHeight(outgoing, incoming);
 
     const animate = transitions[transition] || transitions['cross-fade'];
@@ -210,6 +248,20 @@ function setupTestimonial(component) {
   links.forEach((link, i) => {
     link.addEventListener('click', () => {
       switchToTab(i);
+      resetAutoplay();
+    });
+
+    // Keyboard navigation (WAI-ARIA tab pattern)
+    link.addEventListener('keydown', (e) => {
+      let newIndex = null;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') newIndex = (i + 1) % links.length;
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') newIndex = (i - 1 + links.length) % links.length;
+      else if (e.key === 'Home') newIndex = 0;
+      else if (e.key === 'End') newIndex = links.length - 1;
+      if (newIndex === null) return;
+      e.preventDefault();
+      switchToTab(newIndex);
+      links[newIndex].focus();
       resetAutoplay();
     });
   });
@@ -283,10 +335,23 @@ function setupTestimonial(component) {
     startAutoplay();
   }
 
-  component.addEventListener('mouseenter', stopAutoplay);
-  component.addEventListener('mouseleave', startAutoplay);
+  // Pause autoplay when user is interacting (hover or keyboard focus).
+  let mouseInside = false;
+  let keyboardInside = false;
+  function syncAutoplay() {
+    if (mouseInside || keyboardInside) stopAutoplay();
+    else startAutoplay();
+  }
+  component.addEventListener('mouseenter', () => { mouseInside = true; syncAutoplay(); });
+  component.addEventListener('mouseleave', () => { mouseInside = false; syncAutoplay(); });
+  component.addEventListener('focusin', () => { keyboardInside = true; syncAutoplay(); });
+  component.addEventListener('focusout', () => { keyboardInside = false; syncAutoplay(); });
 
   startAutoplay();
+}
+
+function setIfMissing(el, attr, value) {
+  if (!el.hasAttribute(attr)) el.setAttribute(attr, value);
 }
 
 // --- Image target helper (for stagger push animation) ---
@@ -319,7 +384,10 @@ function extractCMSData(items) {
 
     item.querySelectorAll('[data-image]').forEach((el) => {
       const img = el.tagName === 'IMG' ? el : el.querySelector('img');
-      entry[el.getAttribute('data-image')] = img?.src || '';
+      const key = el.getAttribute('data-image');
+      entry[key] = img?.src || '';
+      entry[`${key}:srcset`] = img?.getAttribute('srcset') || '';
+      entry[`${key}:sizes`] = img?.getAttribute('sizes') || '';
     });
 
     data.push(entry);
@@ -328,6 +396,13 @@ function extractCMSData(items) {
   return data;
 }
 
+// Attributes that should be bound from a specific CMS field on the element they
+// appear on. Add more entries here when new componentised elements need binding.
+const ATTR_BINDINGS = {
+  'data-player-src': 'video-url', // bunny background video component
+  'data-bunny-lightbox-src': 'video-url', // bunny lightbox trigger
+};
+
 function populateElement(container, data) {
   container.querySelectorAll('[data-text]').forEach((el) => {
     const value = data[el.getAttribute('data-text')];
@@ -335,7 +410,8 @@ function populateElement(container, data) {
   });
 
   container.querySelectorAll('[data-image]').forEach((el) => {
-    const value = data[el.getAttribute('data-image')];
+    const key = el.getAttribute('data-image');
+    const value = data[key];
     if (!value) return;
     const img = el.tagName === 'IMG' ? el : el.querySelector('img');
     if (!img) return;
@@ -344,6 +420,48 @@ function populateElement(container, data) {
     // images inside hidden panes haven't loaded yet.
     img.loading = 'eager';
     img.src = value;
+
+    // Carry over the responsive srcset/sizes from the CMS source so the browser
+    // doesn't keep using stale defaults from the template (e.g. the bunny
+    // component's built-in placeholder srcset would otherwise win over our src).
+    const srcset = data[`${key}:srcset`];
+    if (srcset) img.setAttribute('srcset', srcset);
+    else img.removeAttribute('srcset');
+
+    const sizes = data[`${key}:sizes`];
+    if (sizes) img.setAttribute('sizes', sizes);
+    else img.removeAttribute('sizes');
+  });
+
+  Object.entries(ATTR_BINDINGS).forEach(([attr, field]) => {
+    const value = data[field];
+    if (!value) return;
+    container.querySelectorAll(`[${attr}]`).forEach((el) => {
+      el.setAttribute(attr, value);
+    });
+  });
+
+  // Show static image OR bunny video inside the client image wrapper, per pane,
+  // based on whether this item provides a real video URL. We require it to look
+  // like an actual URL (http/https) so stale numeric IDs left over from a
+  // renamed CMS field don't accidentally trigger the video state.
+  const videoUrl = (data['video-url'] || '').trim();
+  const hasVideo = /^https?:\/\//i.test(videoUrl);
+  container.querySelectorAll('.testimonial35_client-image-wrapper').forEach((wrapper) => {
+    // Find the static fallback img (anywhere in the wrapper, but NOT inside
+    // the bunny component — that one is the video's own poster/placeholder).
+    const staticImg = [...wrapper.querySelectorAll('img.image')].find(
+      (img) => !img.closest('.bunny-bg_component-wrapper'),
+    );
+    const videoEl = wrapper.querySelector('.bunny-bg_component-wrapper');
+
+    if (hasVideo) {
+      if (staticImg) staticImg.style.display = 'none';
+      if (videoEl) videoEl.style.display = '';
+    } else {
+      if (videoEl) videoEl.style.display = 'none';
+      if (staticImg) staticImg.style.display = '';
+    }
   });
 }
 
