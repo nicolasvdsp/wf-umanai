@@ -557,13 +557,17 @@ function initMegaNavDirectionalHover() {
     killMobile();
     killMobilePanel();
 
-    menuWrap.setAttribute("data-menu-open", "false");
+    // Don't flip `data-menu-open` to "false" synchronously — the CSS rule
+    // (`[data-menu-open='true'] [data-nav-list]…`) gives the drawer its full
+    // height + scroll on mobile, and removing it mid-animation snaps the
+    // drawer back to its smaller natural size while it's still fading out.
     state.mobileMenuOpen = false;
     state.mobilePanelActive = null;
     burger.setAttribute("aria-expanded", "false");
 
     const tl = gsap.timeline({
       onComplete() {
+        menuWrap.setAttribute("data-menu-open", "false");
         unlockScroll();
         clearMobileTopOffset();
         state.mobileTl = null;
