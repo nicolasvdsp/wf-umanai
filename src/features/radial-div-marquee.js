@@ -327,17 +327,31 @@ function initRadialDivMarquee(container) {
         const nTotal = Math.max(sourceItems.length, nNatural);
         const spacing = pathLen / nTotal;
 
+        // Preserve fractional loop progress across rebuilds so a parent
+        // resize (e.g. the mega-nav's `footer-bg` height animation when
+        // switching panels) doesn't snap items back to offset 0 against the
+        // new spacing — which reads as a visible "jump" of the marquee.
+        // Drive this through the tween's start/end values (not `.progress()`
+        // — that's unreliable on `repeat: -1` tweens because GSAP computes
+        // `totalDuration * progress` with `totalDuration = Infinity`).
+        const prevPathLen = st.pathLen || 0;
+        const ratio = prevPathLen > 0
+          ? (((st.px.x % prevPathLen) + prevPathLen) % prevPathLen) / prevPathLen
+          : 0;
+        const startX = ratio * pathLen;
+        st.pathLen = pathLen;
+
         buildItems(sizes, nTotal);
-        placeItems(0, pathLen, spacing);
+        placeItems(startX, pathLen, spacing);
 
         if (st.tsTw) { st.tsTw.kill(); st.tsTw = null; }
         if (st.tw) st.tw.kill();
         st.tw = null;
         if (prm || !gsap) return;
 
-        st.px.x = 0;
+        st.px.x = startX;
         st.tw = gsap.to(st.px, {
-          x: pathLen,
+          x: startX + pathLen,
           duration: pathLen / speedPx,
           ease: 'none',
           repeat: -1,

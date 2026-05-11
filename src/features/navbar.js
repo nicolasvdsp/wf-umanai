@@ -3,6 +3,7 @@ function initMegaNavDirectionalHover() {
     bgMorph: 0.4,
     contentIn: 0.3,
     contentOut: 0.3,
+    contentOutFast: 0.08,
     stagger: 0.25,
     backdropIn: 0.3,
     backdropOut: 0.3,
@@ -82,6 +83,28 @@ function initMegaNavDirectionalHover() {
     const panelItems = el ? [...el.querySelectorAll("[data-menu-fade]")] : [];
     const footerItems = footer ? [...footer.querySelectorAll("[data-menu-fade]")] : [];
     return [...panelItems, ...footerItems];
+  };
+  // Splits fade items by fade-OUT mode (the value of `data-menu-fade`):
+  //   ""        / unset → "normal": existing autoAlpha + x/y tween.
+  //   "instant"          → short, accelerated autoAlpha tween (DUR.contentOutFast).
+  //   "down"             → slide down via yPercent, autoAlpha untouched.
+  // The motion modes are useful for content that flickers when its opacity is
+  // animated through intermediate values across rapid kill/reset cycles —
+  // e.g. the radial marquee's images. `"instant"` shortens the fade window
+  // enough that the kill/reset/retween glitch doesn't have time to register
+  // visually, while `"down"` keeps the item fully opaque and lets the
+  // `footer-bg`'s shrinking/morphing height clip it from the bottom —
+  // giving exit motion without any opacity animation at all.
+  // Fade-IN is unchanged for all modes: items still fade in normally.
+  const splitFade = (items) => {
+    const instant = [], down = [], normal = [];
+    items.forEach((el) => {
+      const mode = el.getAttribute("data-menu-fade");
+      if (mode === "instant") instant.push(el);
+      else if (mode === "down") down.push(el);
+      else normal.push(el);
+    });
+    return { instant, down, normal };
   };
   const getNavItems = () => navList.querySelectorAll("[data-nav-list-item]");
   const getIndex = (name) => toggles.indexOf(getToggle(name));
@@ -166,7 +189,7 @@ function initMegaNavDirectionalHover() {
   function resetDesktop() {
     panels.forEach((p) => {
       gsap.set(p, { visibility: "hidden", opacity: 0, pointerEvents: "none", xPercent: 0 });
-      gsap.set(getFade(p), { autoAlpha: 0, x: 0, y: 0, xPercent: 0 });
+      gsap.set(getFade(p), { autoAlpha: 0, x: 0, y: 0, xPercent: 0, yPercent: 0 });
     });
     setActiveFooter(null);
     gsap.set(dropContainer, { height: 0 });
@@ -338,7 +361,12 @@ function initMegaNavDirectionalHover() {
       },
     });
     state.tl = tl;
-    if (fade.length) tl.to(fade, { autoAlpha: 0, y: -4, duration: DUR.contentOut * 0.7, ease: "power2.in" }, 0);
+    if (fade.length) {
+      const { instant, down, normal } = splitFade(fade);
+      if (instant.length) tl.to(instant, { autoAlpha: 0, duration: DUR.contentOutFast, ease: "power2.in" }, 0);
+      if (down.length) tl.to(down, { yPercent: 100, duration: DUR.contentOut * 0.7, ease: "power2.in" }, 0);
+      if (normal.length) tl.to(normal, { autoAlpha: 0, y: -4, duration: DUR.contentOut * 0.7, ease: "power2.in" }, 0);
+    }
     tl.to(dropContainer, { height: 0, duration: DUR.closeScale, ease: "power2.in" }, 0.05);
     if (footerBg) {
       tl.to(footerBg, { height: 0, duration: DUR.closeScale, ease: "power2.in" }, 0.05);
@@ -361,13 +389,20 @@ function initMegaNavDirectionalHover() {
 
     killDropdown();
 
-    // Reset all panels, then restore fromEl as visible
+    // Reset every panel EXCEPT fromEl. fromEl is about to fade out, and
+    // snapping its fade items back to `autoAlpha: 1 / x: 0` here would
+    // flicker the footer's contents (e.g. the radial marquee's images)
+    // whenever a previous switchPanel was killed mid-flight by this one —
+    // the killed tween leaves the wrapper at an intermediate value, this
+    // code would slam it back to 1, and the next tween fades it to 0 again.
+    // Letting the new fade-out tween pick up from the current value keeps
+    // the transition smooth.
     panels.forEach((p) => {
+      if (p === fromEl) return;
       gsap.set(p, { visibility: "hidden", opacity: 0, pointerEvents: "none", xPercent: 0 });
-      gsap.set(getFade(p), { autoAlpha: 0, x: 0, y: 0, xPercent: 0 });
+      gsap.set(getFade(p), { autoAlpha: 0, x: 0, y: 0, xPercent: 0, yPercent: 0 });
     });
     gsap.set(fromEl, { visibility: "visible", opacity: 1, pointerEvents: "auto", x: 0 });
-    if (fromFade.length) gsap.set(fromFade, { autoAlpha: 1, x: 0, y: 0 });
     gsap.set(backdrop, { autoAlpha: 1 });
 
     const toToggle = getToggle(toName);
@@ -381,9 +416,14 @@ function initMegaNavDirectionalHover() {
     const tl = gsap.timeline();
     state.tl = tl;
 
-    if (fromFade.length) tl.to(fromFade, { autoAlpha: 0, x: xOut, duration: DUR.contentOut, ease: "power2.in" }, 0);
+    if (fromFade.length) {
+      const { instant, down, normal } = splitFade(fromFade);
+      if (instant.length) tl.to(instant, { autoAlpha: 0, duration: DUR.contentOutFast, ease: "power2.in" }, 0);
+      if (down.length) tl.to(down, { yPercent: 100, duration: DUR.contentOut, ease: "power2.in" }, 0);
+      if (normal.length) tl.to(normal, { autoAlpha: 0, x: xOut, duration: DUR.contentOut, ease: "power2.in" }, 0);
+    }
     tl.set(fromEl, { visibility: "hidden", opacity: 0, pointerEvents: "none", xPercent: 0 }, DUR.contentOut);
-    if (fromFade.length) tl.set(fromFade, { x: 0 }, DUR.contentOut);
+    if (fromFade.length) tl.set(fromFade, { x: 0, yPercent: 0 }, DUR.contentOut);
     tl.to(dropContainer, { height: toHeight, duration: DUR.bgMorph, ease: "power3.out" }, 0.05);
     if (footerBg) {
       tl.to(footerBg, { height: toFooterHeight, duration: DUR.bgMorph, ease: "power3.out" }, 0.05);
