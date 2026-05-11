@@ -166,7 +166,7 @@ function initMegaNavDirectionalHover() {
   function resetDesktop() {
     panels.forEach((p) => {
       gsap.set(p, { visibility: "hidden", opacity: 0, pointerEvents: "none", xPercent: 0 });
-      gsap.set(getFade(p), { autoAlpha: 0, x: 0, y: 0 });
+      gsap.set(getFade(p), { autoAlpha: 0, x: 0, y: 0, xPercent: 0 });
     });
     setActiveFooter(null);
     gsap.set(dropContainer, { height: 0 });
@@ -364,7 +364,7 @@ function initMegaNavDirectionalHover() {
     // Reset all panels, then restore fromEl as visible
     panels.forEach((p) => {
       gsap.set(p, { visibility: "hidden", opacity: 0, pointerEvents: "none", xPercent: 0 });
-      gsap.set(getFade(p), { autoAlpha: 0, x: 0, y: 0 });
+      gsap.set(getFade(p), { autoAlpha: 0, x: 0, y: 0, xPercent: 0 });
     });
     gsap.set(fromEl, { visibility: "visible", opacity: 1, pointerEvents: "auto", x: 0 });
     if (fromFade.length) gsap.set(fromFade, { autoAlpha: 1, x: 0, y: 0 });
