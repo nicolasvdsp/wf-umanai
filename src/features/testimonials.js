@@ -390,6 +390,11 @@ function extractCMSData(items) {
       entry[`${key}:sizes`] = img?.getAttribute('sizes') || '';
     });
 
+    item.querySelectorAll('[data-link]').forEach((el) => {
+      const a = el.tagName === 'A' ? el : el.querySelector('a');
+      entry[el.getAttribute('data-link')] = a?.getAttribute('href') || '';
+    });
+
     data.push(entry);
   });
 
@@ -431,6 +436,14 @@ function populateElement(container, data) {
     const sizes = data[`${key}:sizes`];
     if (sizes) img.setAttribute('sizes', sizes);
     else img.removeAttribute('sizes');
+  });
+
+  container.querySelectorAll('[data-link]').forEach((el) => {
+    const value = data[el.getAttribute('data-link')];
+    if (!value) return;
+    const a = el.tagName === 'A' ? el : el.querySelector('a');
+    if (!a) return;
+    a.setAttribute('href', value);
   });
 
   Object.entries(ATTR_BINDINGS).forEach(([attr, field]) => {
