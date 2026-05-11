@@ -32,6 +32,16 @@ function initMegaNavDirectionalHover() {
     (id) => document.querySelector(`[data-burger-line='${id}']`)
   );
 
+  // Lenis attaches a `passive: false` wheel listener on `window` and calls
+  // `preventDefault()` by default — even with `lenis.stop()` it can swallow
+  // wheel/touch events before they reach the drawer's native scroll.
+  // `data-lenis-prevent` is Lenis's documented opt-out: when set on the event
+  // target's ancestor chain, Lenis lets the browser scroll the element
+  // natively. Harmless on desktop (these aren't scroll containers there).
+  [navList, dropWrapper, dropContainer, ...panels].forEach((el) => {
+    if (el) el.setAttribute("data-lenis-prevent", "");
+  });
+
   // State
   const state = {
     isOpen: false,
