@@ -15,6 +15,7 @@ export const INCLUDE_FEATURES = {
   textScramble: true,
   textStagger: true,
   marquee: true,
+  radialDivMarquee: true,
   vimeoBackground: true,
   parallax: true,
   microInteractions: true,

@@ -12,6 +12,7 @@ import glossary from './features/glossary';
 import textScramble from './features/text-scramble';
 import textStagger from './features/text-stagger';
 import marquee from './features/marquee';
+import radialDivMarquee from './features/radial-div-marquee';
 import vimeoBackground from './features/videos/vimeo-background';
 import vimeoAdvanced from './features/videos/vimeo-advanced';
 import parallax from './features/parallax';
@@ -48,6 +49,7 @@ function runApp() {
     ACTIVE_FEATURES.textScramble && textScramble();
     ACTIVE_FEATURES.textStagger && textStagger();
     ACTIVE_FEATURES.marquee && marquee();
+    ACTIVE_FEATURES.radialDivMarquee && radialDivMarquee();
     ACTIVE_FEATURES.vimeoBackground && vimeoBackground();
     ACTIVE_FEATURES.vimeoAdvanced && vimeoAdvanced();
     ACTIVE_FEATURES.parallax && parallax();
