@@ -2,10 +2,10 @@
   LUCIDE ICONS — CMS-friendly, gradient-ready
 
   Replaces [data-lucide="icon-name"] placeholders with inline Lucide SVGs.
-  Wrapper mode: if the element has a child <svg>, only that child is swapped;
-  the wrapper (classes, CMS bindings, data-gradient-fill) stays intact.
-  When data-gradient-fill is present, a local <defs> gradient is embedded
-  directly inside the SVG so the stroke renders with the gradient.
+  For wrappers with data-gradient-stroke="<name>", applies a gradient stroke
+  via CSS (not inline styles). The gradient is cloned once into the document
+  <defs> with userSpaceOnUse so it works on stroke-based Lucide paths, and
+  a global CSS rule targets the wrapper — surviving any SVG re-render.
 */
 
 const CDN = 'https://unpkg.com/lucide@latest/dist/umd/lucide.min.js';
@@ -15,7 +15,8 @@ const SHAPES = 'path, circle, rect, line, polyline, polygon, ellipse';
 const STRIP = new Set(['viewbox', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'xmlns']);
 
 let loadPromise = null;
-let uid = 0;
+let styleEl = null;
+const gradientsEnsured = new Set();
 
 function loadLucide() {
   if (window.lucide?.createIcons) return Promise.resolve(window.lucide);
@@ -31,9 +32,51 @@ function loadLucide() {
   return loadPromise;
 }
 
+function ensureStrokeGradient(name) {
+  const strokeId = `tab-icon-gradient-${name}-stroke`;
+  if (gradientsEnsured.has(name)) return strokeId;
+
+  const existing = document.getElementById(strokeId);
+  if (existing) {
+    gradientsEnsured.add(name);
+    return strokeId;
+  }
+
+  const src = document.getElementById(`tab-icon-gradient-${name}`);
+  if (!src) return null;
+
+  const clone = src.cloneNode(true);
+  clone.id = strokeId;
+  clone.setAttribute('gradientUnits', 'userSpaceOnUse');
+  ['x1', 'y1', 'x2', 'y2'].forEach((a) => {
+    const v = parseFloat(clone.getAttribute(a));
+    if (!Number.isNaN(v)) clone.setAttribute(a, v * VIEWBOX);
+  });
+  src.parentNode.appendChild(clone);
+
+  // Append a CSS rule so the gradient is applied even after the SVG is
+  // replaced by Lucide / Finsweet / etc. — no inline styles to lose.
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.setAttribute('data-lucide-icons-styles', '');
+    document.head.appendChild(styleEl);
+  }
+  styleEl.sheet.insertRule(
+    `[data-gradient-stroke="${name}"] :is(${SHAPES}) {
+      stroke: url(#${strokeId}) !important;
+      fill: none !important;
+    }`,
+    styleEl.sheet.cssRules.length
+  );
+
+  gradientsEnsured.add(name);
+  return strokeId;
+}
+
 function prepareTargets(wrappers) {
   let count = 0;
   wrappers.forEach((w) => {
+    if (w.hasAttribute('data-lucide-rendered')) return;
     const name = w.getAttribute('data-lucide');
     if (!name) return;
     const target = w.querySelector('svg') || w;
@@ -48,54 +91,50 @@ function prepareTargets(wrappers) {
   return count;
 }
 
-function applyGradients(wrappers) {
+function ensureGradientsFor(wrappers) {
   wrappers.forEach((w) => {
-    const gradientName = w.getAttribute('data-gradient-fill');
-    if (!gradientName) return;
-
-    const svg = w.querySelector('svg');
-    if (!svg) return;
-
-    const src = document.getElementById(`tab-icon-gradient-${gradientName}`);
-    if (!src) {
-      console.warn(`[lucide-icons] #tab-icon-gradient-${gradientName} not found in DOM`);
-      return;
-    }
-
-    const localId = `_li${uid++}`;
-    const grad = src.cloneNode(true);
-    grad.id = localId;
-    grad.setAttribute('gradientUnits', 'userSpaceOnUse');
-    ['x1', 'y1', 'x2', 'y2'].forEach((a) => {
-      const v = parseFloat(grad.getAttribute(a));
-      if (!Number.isNaN(v)) grad.setAttribute(a, v * VIEWBOX);
-    });
-
-    const defs = document.createElementNS(NS, 'defs');
-    defs.appendChild(grad);
-    svg.prepend(defs);
-
-    svg.querySelectorAll(SHAPES).forEach((el) => {
-      el.style.stroke = `url(#${localId})`;
-      el.style.fill = 'none';
-    });
+    const name = w.getAttribute('data-gradient-stroke');
+    if (name) ensureStrokeGradient(name);
   });
 }
 
-function renderIconsIn(container) {
-  const wrappers = (container || document).querySelectorAll('[data-lucide]:not([data-lucide-rendered])');
+function processWrappers(wrappers) {
   if (!wrappers.length) return;
-
   loadLucide()
     .then((lucide) => {
-      if (!prepareTargets(wrappers)) return;
+      const fresh = [...wrappers].filter((w) => w.isConnected && !w.hasAttribute('data-lucide-rendered'));
+      if (!fresh.length) return;
+      if (!prepareTargets(fresh)) return;
       lucide.createIcons({ nameAttr: 'data-lucide-render' });
-      applyGradients(wrappers);
+      ensureGradientsFor(fresh);
     })
     .catch((err) => console.warn('[lucide-icons]', err));
 }
 
+function renderIconsIn(container) {
+  const scope = container || document;
+  processWrappers(scope.querySelectorAll('[data-lucide]:not([data-lucide-rendered])'));
+}
+
+let observer = null;
+function startObserver() {
+  if (observer) return;
+  observer = new MutationObserver((mutations) => {
+    const found = [];
+    for (const m of mutations) {
+      m.addedNodes.forEach((node) => {
+        if (node.nodeType !== 1) return;
+        if (node.matches?.('[data-lucide]:not([data-lucide-rendered])')) found.push(node);
+        node.querySelectorAll?.('[data-lucide]:not([data-lucide-rendered])').forEach((el) => found.push(el));
+      });
+    }
+    if (found.length) processWrappers(found);
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
 function lucideIcons() {
+  startObserver();
   document.addEventListener('barba:pageVisible', (e) => {
     renderIconsIn(e.detail.container);
   });
