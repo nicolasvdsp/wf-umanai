@@ -20,9 +20,11 @@ function initMegaNavDirectionalHover() {
   const dropWrapper = document.querySelector("[data-dropdown-wrapper]");
   const dropContainer = document.querySelector("[data-dropdown-container]");
   const dropBg = document.querySelector("[data-dropdown-bg]");
+  const footerBg = document.querySelector("[data-footer-bg]");
   const backdrop = document.querySelector("[data-menu-backdrop]");
   const toggles = [...document.querySelectorAll("[data-dropdown-toggle]")];
   const panels = [...document.querySelectorAll("[data-nav-content]")];
+  const footers = [...document.querySelectorAll("[data-dropdown-footer]")];
   const burger = document.querySelector("[data-burger-toggle]");
   const backBtn = document.querySelector("[data-mobile-back]");
   const logo = document.querySelector("[data-menu-logo]");
@@ -48,10 +50,74 @@ function initMegaNavDirectionalHover() {
   // Helpers
   const getPanel = (name) => document.querySelector(`[data-nav-content="${name}"]`);
   const getToggle = (name) => document.querySelector(`[data-dropdown-toggle="${name}"]`);
-  const getFade = (el) => el.querySelectorAll("[data-menu-fade]");
+  const getFooter = (name) =>
+    name ? document.querySelector(`[data-dropdown-footer="${name}"]`) : null;
+  // Footers stack on top of each other inside `mega-nav__footer-bg`. The CSS
+  // default is `pointer-events: none` so the inactive footer can't swallow
+  // hovers/clicks. We promote only the active panel's footer to `auto` so
+  // links inside it work and hovering it doesn't fall through to the layer
+  // beneath (which can trigger an unintended close).
+  const setActiveFooter = (name) => {
+    footers.forEach((f) => {
+      const active = name && f.getAttribute("data-dropdown-footer") === name;
+      f.style.pointerEvents = active ? "auto" : "none";
+    });
+  };
+  // Returns both the panel's own fade items AND the matching footer's items, so
+  // every animation (open / close / switch) treats footer pieces exactly like
+  // col items — same stagger, same directional slide.
+  const getFade = (el) => {
+    const name = el?.getAttribute?.("data-nav-content");
+    const footer = getFooter(name);
+    const panelItems = el ? [...el.querySelectorAll("[data-menu-fade]")] : [];
+    const footerItems = footer ? [...footer.querySelectorAll("[data-menu-fade]")] : [];
+    return [...panelItems, ...footerItems];
+  };
   const getNavItems = () => navList.querySelectorAll("[data-nav-list-item]");
   const getIndex = (name) => toggles.indexOf(getToggle(name));
   const stagger = (n) => (n <= 1 ? 0 : { amount: DUR.stagger });
+  // Natural content height of a panel's footer. Returns 0 if the panel has no
+  // footer (Resources).
+  //
+  // The footer is `position: absolute; inset: 0` inside a `footer-bg` that we
+  // collapse to `height: 0`. Setting `footer-bg` to `height: auto` alone is
+  // not enough: absolutely-positioned children don't contribute to a parent's
+  // content size, so auto would resolve to 0. We also have to temporarily
+  // promote the footer itself to `position: relative` so its content (e.g.
+  // the radial marquee with aspect-ratio sizing) drives the layout.
+  const measureFooter = (name) => {
+    const f = getFooter(name);
+    if (!f) return 0;
+    if (!footerBg) return f.scrollHeight;
+
+    const prevBgH = footerBg.style.height;
+    const prevBgOverflow = footerBg.style.overflow;
+    const prevPos = f.style.position;
+    const prevTop = f.style.top;
+    const prevRight = f.style.right;
+    const prevBottom = f.style.bottom;
+    const prevLeft = f.style.left;
+
+    footerBg.style.height = "auto";
+    footerBg.style.overflow = "visible";
+    f.style.position = "relative";
+    f.style.top = "auto";
+    f.style.right = "auto";
+    f.style.bottom = "auto";
+    f.style.left = "auto";
+
+    const h = f.offsetHeight;
+
+    footerBg.style.height = prevBgH;
+    footerBg.style.overflow = prevBgOverflow;
+    f.style.position = prevPos;
+    f.style.top = prevTop;
+    f.style.right = prevRight;
+    f.style.bottom = prevBottom;
+    f.style.left = prevLeft;
+
+    return h;
+  };
 
   function clearTimers() {
     clearTimeout(state.hoverTimer);
@@ -66,6 +132,7 @@ function initMegaNavDirectionalHover() {
   function killDropdown() {
     killTl("tl");
     gsap.killTweensOf(dropContainer);
+    if (footerBg) gsap.killTweensOf(footerBg);
     gsap.killTweensOf(backdrop);
     panels.forEach((p) => { gsap.killTweensOf(p); gsap.killTweensOf(getFade(p)); });
   }
@@ -91,7 +158,9 @@ function initMegaNavDirectionalHover() {
       gsap.set(p, { visibility: "hidden", opacity: 0, pointerEvents: "none", xPercent: 0 });
       gsap.set(getFade(p), { autoAlpha: 0, x: 0, y: 0 });
     });
+    setActiveFooter(null);
     gsap.set(dropContainer, { height: 0 });
+    if (footerBg) gsap.set(footerBg, { height: 0 });
     gsap.set(backdrop, { autoAlpha: 0 });
     menuWrap.setAttribute("data-menu-open", "false");
     resetToggles();
@@ -107,6 +176,7 @@ function initMegaNavDirectionalHover() {
     gsap.set(backBtn, { autoAlpha: 0 });
     gsap.set(logo, { autoAlpha: 1 });
     gsap.set(dropContainer, { clearProps: "height" });
+    if (footerBg) gsap.set(footerBg, { clearProps: "height" });
     gsap.set(backdrop, { autoAlpha: 0 });
   }
 
@@ -182,6 +252,9 @@ function initMegaNavDirectionalHover() {
     }
   }
 
+  // Cols-only height of a panel. The footer lives outside the panel now (inside
+  // .mega-nav__footer-bg), so its height is added separately when computing the
+  // dropdown-container morph target.
   function measurePanel(name) {
     const el = getPanel(name);
     if (!el) return 0;
@@ -198,8 +271,10 @@ function initMegaNavDirectionalHover() {
     if (state.isOpen && state.activePanel === panelName) return;
     if (state.isOpen) return switchPanel(state.activePanel, panelName);
 
-    const height = measurePanel(panelName);
-    if (!height) return;
+    const colsHeight = measurePanel(panelName);
+    const footerHeight = measureFooter(panelName);
+    const totalHeight = colsHeight + footerHeight;
+    if (!totalHeight) return;
 
     killDropdown();
     resetDesktop();
@@ -213,13 +288,18 @@ function initMegaNavDirectionalHover() {
     state.activePanelIndex = getIndex(panelName);
     menuWrap.setAttribute("data-menu-open", "true");
     if (toggle) toggle.setAttribute("aria-expanded", "true");
+    setActiveFooter(panelName);
 
     gsap.set(dropContainer, { height: 0 });
+    if (footerBg) gsap.set(footerBg, { height: 0 });
 
     const tl = gsap.timeline();
     state.tl = tl;
     tl.to(backdrop, { autoAlpha: 1, duration: DUR.backdropIn, ease: "power2.out" }, 0);
-    tl.to(dropContainer, { height, duration: DUR.openScale, ease: "power3.out" }, 0);
+    tl.to(dropContainer, { height: totalHeight, duration: DUR.openScale, ease: "power3.out" }, 0);
+    if (footerBg) {
+      tl.to(footerBg, { height: footerHeight, duration: DUR.openScale, ease: "power3.out" }, 0);
+    }
     tl.set(el, { visibility: "visible", opacity: 1, pointerEvents: "auto" }, 0.05);
     if (fade.length) {
       tl.fromTo(fade,
@@ -250,6 +330,9 @@ function initMegaNavDirectionalHover() {
     state.tl = tl;
     if (fade.length) tl.to(fade, { autoAlpha: 0, y: -4, duration: DUR.contentOut * 0.7, ease: "power2.in" }, 0);
     tl.to(dropContainer, { height: 0, duration: DUR.closeScale, ease: "power2.in" }, 0.05);
+    if (footerBg) {
+      tl.to(footerBg, { height: 0, duration: DUR.closeScale, ease: "power2.in" }, 0.05);
+    }
     tl.to(backdrop, { autoAlpha: 0, duration: DUR.backdropOut, ease: "power2.out" }, 0);
     if (el) tl.set(el, { visibility: "hidden", opacity: 0, pointerEvents: "none" });
   }
@@ -261,7 +344,9 @@ function initMegaNavDirectionalHover() {
     if (!fromEl || !toEl) return;
 
     const fromFade = getFade(fromEl), toFade = getFade(toEl);
-    const toHeight = measurePanel(toName);
+    const toColsHeight = measurePanel(toName);
+    const toFooterHeight = measureFooter(toName);
+    const toHeight = toColsHeight + toFooterHeight;
     if (!toHeight) return;
 
     killDropdown();
@@ -280,6 +365,7 @@ function initMegaNavDirectionalHover() {
     state.activePanelIndex = getIndex(toName);
     resetToggles();
     if (toToggle) toToggle.setAttribute("aria-expanded", "true");
+    setActiveFooter(toName);
 
     const xOut = dir * -30, xIn = dir * 30;
     const tl = gsap.timeline();
@@ -289,6 +375,9 @@ function initMegaNavDirectionalHover() {
     tl.set(fromEl, { visibility: "hidden", opacity: 0, pointerEvents: "none", xPercent: 0 }, DUR.contentOut);
     if (fromFade.length) tl.set(fromFade, { x: 0 }, DUR.contentOut);
     tl.to(dropContainer, { height: toHeight, duration: DUR.bgMorph, ease: "power3.out" }, 0.05);
+    if (footerBg) {
+      tl.to(footerBg, { height: toFooterHeight, duration: DUR.bgMorph, ease: "power3.out" }, 0.05);
+    }
     tl.set(toEl, { visibility: "visible", opacity: 1, pointerEvents: "auto", xPercent: 0 }, DUR.contentOut * 0.5);
     if (toFade.length) {
       tl.fromTo(toFade,
