@@ -29,4 +29,5 @@ export const INCLUDE_FEATURES = {
   bunnyBackground: true,
   bunnyLightbox: true,
   hubspot: true,
+  pushmotionMarquee: true,
 }
