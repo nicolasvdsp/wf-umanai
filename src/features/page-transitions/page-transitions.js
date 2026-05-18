@@ -59,6 +59,7 @@ function initPageTransitions() {
   function initAfterEnterFunctions(next) {
     nextPage = next || document;
     const scope = isFirstEnter ? document : nextPage;
+    const skipFsReinit = isFirstEnter;
     isFirstEnter = false;
 
     dispatchPageVisible(scope);
@@ -68,7 +69,7 @@ function initPageTransitions() {
     // if (has('[data-something]')) initSomething();
     // if (has('[data-overlap-slider-init]')) initOverlappingSlider();
 
-    reinitFsAttributes();
+    if (!skipFsReinit) reinitFsAttributes();
 
     if (lenis) {
       lenis.resize();
@@ -783,7 +784,7 @@ function initPageTransitions() {
     preventRunning: true,
     prevent: ({ el }) => {
       if (el?.hash && el.pathname.replace(/\/$/, '') === window.location.pathname.replace(/\/$/, '')) return true;
-      return !!el?.closest('[fs-cmsfilter-clear], [fs-cmsfilter-element], [fs-cmssort-element], [fs-cmsfilter-field], [fs-list-element="clear"]');
+      return !!el?.closest('[fs-cmsfilter-clear], [fs-cmsfilter-element], [fs-cmssort-element], [fs-cmsfilter-field], [fs-list-element], .w-pagination-next, .w-pagination-previous, .w-pagination-wrapper');
     },
     transitions: [
       { //item to detail page
