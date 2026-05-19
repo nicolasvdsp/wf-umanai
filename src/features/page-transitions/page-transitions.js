@@ -779,7 +779,7 @@ function initPageTransitions() {
   });
 
   barba.init({
-    debug: true, // Set to 'false' in production
+    debug: false, // Set to 'false' in production
     timeout: 7000,
     preventRunning: true,
     prevent: ({ el }) => {
@@ -1020,7 +1020,7 @@ function initPageTransitions() {
     // Attributes v2
     if (FA?.modules) {
       Object.values(FA.modules).forEach(m => {
-        try { m.restart?.(); } catch (_) {}
+        try { m.restart?.(); } catch (_) { }
       });
       return;
     }
