@@ -47,7 +47,8 @@ The loader logic is built into the bundle itself. It automatically detects the e
 | Environment | What happens |
 |---|---|
 | **Production** (custom domain) | Runs the bundled code immediately. Zero overhead. |
-| **Staging** (`.webflow.io`) + `npm run dev` | Detects **HTTPS** localhost dev server → loads dev version with HMR. |
+| **Staging** (`.webflow.io`) + `npm run dev` (HTTP) | Loads dev version from `http://localhost:3012` with HMR. |
+| **Staging** (`.webflow.io`) + `npm run dev:https` + `https-mode` attribute | Loads dev version from `https://localhost:3012` (Safari-safe; accept the self-signed cert once). |
 | **Staging** (`.webflow.io`) without dev server | Falls back to bundled code. |
 
 No manual toggles. No changes needed between development and production.
@@ -56,11 +57,21 @@ No manual toggles. No changes needed between development and production.
 
 1. **Start the dev server:**
    ```bash
-   npm run dev
+   npm run dev           # HTTP  → http://localhost:3012  (default)
+   npm run dev:https     # HTTPS → https://localhost:3012 (opt-in)
    ```
-   This starts Vite on **`https://localhost:3012`**. The first time, your browser will warn about the **self-signed certificate** — proceed once (Safari/Chrome need this so `https://*.webflow.io` can load localhost without mixed-content blocking).
 
-   Use **`npm run dev:http`** only if you intentionally want plain HTTP on port 3012 (then the staging loader will not connect from an HTTPS Webflow page in Safari).
+   The Webflow `<script>` opts in per mode:
+
+   ```html
+   <!-- HTTP localhost (default) -->
+   <script defer src="https://MY-PROJECT.netlify.app/main.min.js" dev-mode></script>
+
+   <!-- HTTPS localhost (Safari + https://*.webflow.io) -->
+   <script defer src="https://MY-PROJECT.netlify.app/main.min.js" dev-mode https-mode></script>
+   ```
+
+   With `https-mode`, the first load will require accepting the **self-signed certificate** — open `https://localhost:3012` once in the same browser, click through the warning, then reload the Webflow staging page.
 
 2. **Open your Webflow staging site** (`your-project.webflow.io`)
 

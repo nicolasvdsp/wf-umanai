@@ -16,7 +16,7 @@ A modern, scalable template for adding custom JavaScript to Webflow projects usi
 1. `npm install`
 2. Configure features in `src/config.js`
 3. Add your bundle to Webflow → see [Webflow Setup](documentation/webflow-setup.md)
-4. `npm run dev` → open your `.webflow.io` staging site (HTTPS localhost; accept the cert once in the browser)
+4. `npm run dev` → open your `.webflow.io` staging site (HTTP localhost). Use `npm run dev:https` only if your `<script dev-mode>` tag also has `https-mode`.
 5. `npm run build` → push to GitHub → Netlify auto-deploys
 
 ## Project Structure
@@ -40,8 +40,8 @@ A modern, scalable template for adding custom JavaScript to Webflow projects usi
 
 | Command | Description |
 |---|---|
-| `npm run dev` | Start dev server with HMR on **`https://localhost:3012`** (self-signed TLS) |
-| `npm run dev:http` | Same as above but **HTTP** (opt-out if TLS gets in the way) |
+| `npm run dev` | Start dev server with HMR on **`http://localhost:3012`** (default) |
+| `npm run dev:https` | Same as above but **HTTPS** (self-signed TLS, opt-in via `https-mode` on the Webflow script tag) |
 | `npm run build` | Build `main.js` + `main.min.js` to `dist/` |
 | `npm run preview` | Preview production build locally |
 | `npm run clean` | Clean dist folder |

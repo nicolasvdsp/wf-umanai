@@ -28,11 +28,26 @@ Uman marketing website built in **Webflow**, with a custom JS/SCSS layer on top 
 | Custom CSS | SCSS in `src/scss/components/` |
 | Animations | GSAP + ScrollTrigger (`window.gsap`) |
 | Page transitions | Barba.js |
-| Build | Vite (`npm run dev` = HTTPS localhost; `npm run dev:http` = opt-out) |
+| Build | Vite (`npm run dev` = HTTP localhost; `npm run dev:https` = HTTPS opt-in) |
 
-### Local HTTPS (default dev server)
+### Dev-mode protocol (HTTP vs HTTPS)
 
-`npm run dev` serves **`https://localhost:3012`** (self-signed cert — accept once in the browser). That matches the staging **dev-mode** loader and avoids **mixed-content** blocks when testing `https://*.webflow.io` in Safari. Use **`npm run dev:http`** only if you need plain HTTP (e.g. tooling that cannot handle TLS).
+The Webflow `<script>` carries the protocol opt-in:
+
+```html
+<!-- HTTP localhost (default) -->
+<script defer src="https://uman-ai.netlify.app/main.min.js" dev-mode></script>
+
+<!-- HTTPS localhost (use when staging is HTTPS + Safari blocks mixed content) -->
+<script defer src="https://uman-ai.netlify.app/main.min.js" dev-mode https-mode></script>
+```
+
+Run the matching Vite command:
+
+- `npm run dev` → `http://localhost:3012` (no certificate prompts)
+- `npm run dev:https` → `https://localhost:3012` (accept the self-signed cert in the browser once: open `https://localhost:3012` directly, click through, then reload Webflow)
+
+Browsers reject `fetch()` to self-signed `https://localhost` with no trust prompt, so the loader uses `<script type="module">` injection (which uses the same TLS stack as normal Vite loads) — that path works in both modes.
 
 ---
 

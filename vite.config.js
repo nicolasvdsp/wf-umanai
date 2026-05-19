@@ -2,10 +2,10 @@ import { defineConfig } from 'vite'
 import terser from '@rollup/plugin-terser'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 
-// HTTPS on localhost by default so https://*.webflow.io (dev-mode loader) can
-// load scripts without mixed-content blocking (Safari is strict). Opt out with
-// `VITE_DEV_HTTP=1` → `npm run dev:http` if you need plain HTTP.
-const useHttps = process.env.VITE_DEV_HTTP !== '1'
+// HTTP by default (no certificate prompts). Opt in to HTTPS with
+// `VITE_DEV_HTTPS=1` → `npm run dev:https` to match the `https-mode` attribute
+// on the staging dev-mode <script> tag (needed for Safari on https://*.webflow.io).
+const useHttps = process.env.VITE_DEV_HTTPS === '1'
 
 export default defineConfig({
   plugins: useHttps ? [basicSsl()] : [],

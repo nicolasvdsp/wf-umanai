@@ -1,18 +1,32 @@
 /** Staging / Localhost Detection
  *
- * On staging (.webflow.io) with dev-mode attribute: tries localhost dev server first.
- * If localhost is available, loads the dev version with HMR (HTTPS — required so
- * Safari does not block scripts on an https:// page).
- * If not, falls back to the bundled code.
+ * On staging (.webflow.io) with the `dev-mode` attribute: loads the Vite dev
+ * bundle from localhost. Falls back to the deployed bundle if the dev server
+ * is unreachable.
+ *
+ * Two opt-in modes (set on the SAME <script> tag as `dev-mode`):
+ *   - default                  → http://localhost:3012   (run `npm run dev`)
+ *   - `https-mode` attribute   → https://localhost:3012  (run `npm run dev:https`)
+ *
+ * Use `https-mode` when you need to load this bundle into an https://*.webflow.io
+ * page (Safari blocks `http://` script tags as mixed content). The first load of
+ * `https://localhost:3012` requires accepting the self-signed certificate once
+ * in the browser. With `http-mode` (default) no certificate dance is needed.
  *
  * On production (custom domain): runs the bundled code immediately.
  *
- * Usage: <script src="main.min.js" dev-mode></script>
+ * We do NOT probe with `fetch()` because browsers reject self-signed certs for
+ * fetch with `ERR_CERT_AUTHORITY_INVALID` and never show a trust prompt — the
+ * script-tag injection path matches the way Vite is normally loaded.
+ *
+ * Usage:
+ *   <script src="main.min.js" dev-mode></script>              // HTTP localhost
+ *   <script src="main.min.js" dev-mode https-mode></script>   // HTTPS localhost
  */
 
 const DEV_PORT = 3012;
-const DEV_MESSAGE = "🚧 Dev Mode activated";
-const LIVE_MESSAGE = "🛸 Hi there explorer! You have stumbeled upon the mothership. Lookinging for secretes?";
+const DEV_MESSAGE = '🚧 Dev Mode activated';
+const LIVE_MESSAGE = '🛸 Hi there explorer! You have stumbeled upon the mothership. Lookinging for secretes?';
 
 export function detectAndRun(runApp) {
   if (window.__LOADER_EXECUTED) {
@@ -22,10 +36,11 @@ export function detectAndRun(runApp) {
   window.__LOADER_EXECUTED = true;
 
   const isStaging = window.location.hostname.endsWith('.webflow.io');
-  const hasDevMode = !!document.querySelector('script[src*="main"][dev-mode]');
+  const devScript = document.querySelector('script[src*="main"][dev-mode]');
 
-  if (isStaging && hasDevMode) {
-    tryLocalDevServer(runApp);
+  if (isStaging && devScript) {
+    const useHttps = devScript.hasAttribute('https-mode');
+    tryLocalDevServer(runApp, useHttps);
   } else {
     runBundled(runApp);
   }
@@ -36,29 +51,62 @@ function runBundled(runApp) {
   runApp();
 }
 
-function tryLocalDevServer(runApp) {
-  const devOrigin = `https://localhost:${DEV_PORT}`;
-  const localhostUrl = `${devOrigin}/src/main.js`;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 300);
+function tryLocalDevServer(runApp, useHttps) {
+  const protocol = useHttps ? 'https' : 'http';
+  const devOrigin = `${protocol}://localhost:${DEV_PORT}`;
+  const mainUrl = `${devOrigin}/src/main.js`;
 
-  fetch(localhostUrl, { method: 'HEAD', signal: controller.signal, mode: 'no-cors' })
-    .then(() => {
-      clearTimeout(timeoutId);
-      console.log(DEV_MESSAGE);
+  let settled = false;
+  let outerTimer = null;
+  let mainTimer = null;
 
-      const viteClient = document.createElement('script');
-      viteClient.type = 'module';
-      viteClient.src = `${devOrigin}/@vite/client`;
-      document.head.appendChild(viteClient);
+  const failToBundled = (reason) => {
+    clearTimeout(outerTimer);
+    clearTimeout(mainTimer);
+    if (settled) return;
+    settled = true;
+    if (reason) {
+      const certHint = useHttps
+        ? ` If Vite is running, open ${devOrigin} once in this browser and accept the self-signed certificate.`
+        : '';
+      console.warn(`[dev-mode] Using bundled JS (${reason}).${certHint}`);
+    }
+    runBundled(runApp);
+  };
 
-      const devScript = document.createElement('script');
-      devScript.type = 'module';
-      devScript.src = localhostUrl;
-      document.body.appendChild(devScript);
-    })
-    .catch(() => {
-      clearTimeout(timeoutId);
-      runBundled(runApp);
-    });
+  outerTimer = setTimeout(() => {
+    failToBundled('timeout waiting for @vite/client');
+  }, 8000);
+
+  const viteClient = document.createElement('script');
+  viteClient.type = 'module';
+  viteClient.src = `${devOrigin}/@vite/client`;
+  viteClient.onerror = () => {
+    const reason = useHttps
+      ? 'could not load @vite/client (server off or TLS not trusted)'
+      : 'could not load @vite/client (server off)';
+    failToBundled(reason);
+  };
+  viteClient.onload = () => {
+    clearTimeout(outerTimer);
+    mainTimer = setTimeout(() => {
+      failToBundled('timeout waiting for src/main.js');
+    }, 12000);
+
+    const devScript = document.createElement('script');
+    devScript.type = 'module';
+    devScript.src = mainUrl;
+    devScript.onerror = () => {
+      failToBundled('could not load src/main.js');
+    };
+    devScript.onload = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(mainTimer);
+      console.log(`${DEV_MESSAGE} (${protocol.toUpperCase()})`);
+    };
+    document.body.appendChild(devScript);
+  };
+
+  document.head.appendChild(viteClient);
 }

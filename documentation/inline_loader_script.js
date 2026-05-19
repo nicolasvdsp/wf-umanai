@@ -30,7 +30,9 @@
   // ============================================
   // URL CONSTRUCTION
   // ============================================
-  const LOCAL_URL = `https://localhost:${LOCAL_PORT}`;
+  // Default to HTTP. Change to `https://` if you run `npm run dev:https` (and
+  // accept the self-signed certificate in your browser).
+  const LOCAL_URL = `http://localhost:${LOCAL_PORT}`;
   const LOCALHOST_SCRIPTS = [
     `${LOCAL_URL}/@vite/client`,
     `${LOCAL_URL}/src/main.js`,
