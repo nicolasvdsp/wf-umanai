@@ -30,7 +30,7 @@
   // ============================================
   // URL CONSTRUCTION
   // ============================================
-  const LOCAL_URL = `http://localhost:${LOCAL_PORT}`;
+  const LOCAL_URL = `https://localhost:${LOCAL_PORT}`;
   const LOCALHOST_SCRIPTS = [
     `${LOCAL_URL}/@vite/client`,
     `${LOCAL_URL}/src/main.js`,

@@ -1,7 +1,8 @@
 /** Staging / Localhost Detection
  *
  * On staging (.webflow.io) with dev-mode attribute: tries localhost dev server first.
- * If localhost is available, loads the dev version with HMR.
+ * If localhost is available, loads the dev version with HMR (HTTPS — required so
+ * Safari does not block scripts on an https:// page).
  * If not, falls back to the bundled code.
  *
  * On production (custom domain): runs the bundled code immediately.
@@ -36,7 +37,8 @@ function runBundled(runApp) {
 }
 
 function tryLocalDevServer(runApp) {
-  const localhostUrl = `http://localhost:${DEV_PORT}/src/main.js`;
+  const devOrigin = `https://localhost:${DEV_PORT}`;
+  const localhostUrl = `${devOrigin}/src/main.js`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 300);
 
@@ -47,7 +49,7 @@ function tryLocalDevServer(runApp) {
 
       const viteClient = document.createElement('script');
       viteClient.type = 'module';
-      viteClient.src = `http://localhost:${DEV_PORT}/@vite/client`;
+      viteClient.src = `${devOrigin}/@vite/client`;
       document.head.appendChild(viteClient);
 
       const devScript = document.createElement('script');

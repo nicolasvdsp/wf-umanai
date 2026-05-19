@@ -1,18 +1,22 @@
 import { defineConfig } from 'vite'
 import terser from '@rollup/plugin-terser'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 
-
-const httpsConfig = false
+// HTTPS on localhost by default so https://*.webflow.io (dev-mode loader) can
+// load scripts without mixed-content blocking (Safari is strict). Opt out with
+// `VITE_DEV_HTTP=1` → `npm run dev:http` if you need plain HTTP.
+const useHttps = process.env.VITE_DEV_HTTP !== '1'
 
 export default defineConfig({
+  plugins: useHttps ? [basicSsl()] : [],
   server: {
     host: 'localhost',
     port: 3012,
     cors: true,
-    https: httpsConfig, // Set to true or cert object if using HTTPS
+    https: useHttps,
     hmr: {
       host: 'localhost',
-      protocol: 'ws', // Change to 'wss' if using HTTPS
+      protocol: useHttps ? 'wss' : 'ws',
     },
   },
   build: {

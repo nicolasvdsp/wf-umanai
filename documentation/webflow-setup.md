@@ -47,7 +47,7 @@ The loader logic is built into the bundle itself. It automatically detects the e
 | Environment | What happens |
 |---|---|
 | **Production** (custom domain) | Runs the bundled code immediately. Zero overhead. |
-| **Staging** (`.webflow.io`) + `npm run dev` | Detects localhost dev server → loads dev version with HMR. |
+| **Staging** (`.webflow.io`) + `npm run dev` | Detects **HTTPS** localhost dev server → loads dev version with HMR. |
 | **Staging** (`.webflow.io`) without dev server | Falls back to bundled code. |
 
 No manual toggles. No changes needed between development and production.
@@ -58,7 +58,9 @@ No manual toggles. No changes needed between development and production.
    ```bash
    npm run dev
    ```
-   This starts Vite on `localhost:3012`.
+   This starts Vite on **`https://localhost:3012`**. The first time, your browser will warn about the **self-signed certificate** — proceed once (Safari/Chrome need this so `https://*.webflow.io` can load localhost without mixed-content blocking).
+
+   Use **`npm run dev:http`** only if you intentionally want plain HTTP on port 3012 (then the staging loader will not connect from an HTTPS Webflow page in Safari).
 
 2. **Open your Webflow staging site** (`your-project.webflow.io`)
 

@@ -28,7 +28,11 @@ Uman marketing website built in **Webflow**, with a custom JS/SCSS layer on top 
 | Custom CSS | SCSS in `src/scss/components/` |
 | Animations | GSAP + ScrollTrigger (`window.gsap`) |
 | Page transitions | Barba.js |
-| Build | Vite (via `npm run dev`) |
+| Build | Vite (`npm run dev` = HTTPS localhost; `npm run dev:http` = opt-out) |
+
+### Local HTTPS (default dev server)
+
+`npm run dev` serves **`https://localhost:3012`** (self-signed cert — accept once in the browser). That matches the staging **dev-mode** loader and avoids **mixed-content** blocks when testing `https://*.webflow.io` in Safari. Use **`npm run dev:http`** only if you need plain HTTP (e.g. tooling that cannot handle TLS).
 
 ---
 
