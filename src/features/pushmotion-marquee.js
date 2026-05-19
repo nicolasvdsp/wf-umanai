@@ -100,8 +100,12 @@ function setupComponent(component) {
     `cubic-bezier(${snapStyle.bezier.join(', ')})`
   );
 
-  // Optional inter-item gap override (applied to the flex track so layout + math agree).
+  // Optional inter-item gap override. Set both `gap` and `column-gap` — Safari
+  // often exposes flex row spacing on `gap` while Webflow / our earlier code
+  // only wrote `column-gap`, which can leave `getComputedStyle(...).gap` at
+  // `normal` and break our width/offset math.
   if (Number.isFinite(gapAttr)) {
+    track.style.gap = `${gapAttr}px`;
     track.style.columnGap = `${gapAttr}px`;
   }
 
@@ -124,32 +128,62 @@ function setupComponent(component) {
   let logoGap = 0;
   let logoWidth = 0;
   let compWidth = 0;
+  let trackOffsetX = 0;
   let activeIndex = originalCount; // start in the middle copy
   let isAnimating = false;
   let autoplayTimer = null;
   let isVisible = true;
 
   function measure() {
+    // GSAP `x` transforms move items visually but flex still lays out as if
+    // x = 0. Safari + wrong `gap` parsing then desyncs `naturalLefts` from
+    // reality and the "centre logo + active" math drifts (logo looks centred
+    // alone, gaps look wrong). Zero transforms, force reflow, then measure from
+    // actual geometry.
+    gsap.set([logo, ...allItems], { x: 0 });
+    void track.offsetHeight;
+
     const trackStyles = window.getComputedStyle(track);
-    gap = parseFloat(trackStyles.columnGap) || parseFloat(trackStyles.gap) || 0;
-    logoGap = Number.isFinite(logoGapAttr) ? logoGapAttr : gap;
+    const parsedGap =
+      parseFloat(trackStyles.gap)
+      || parseFloat(trackStyles.columnGap)
+      || parseFloat(trackStyles.rowGap)
+      || 0;
 
     const compRect = component.getBoundingClientRect();
     compWidth = compRect.width;
 
+    const trackRect = track.getBoundingClientRect();
+    trackOffsetX = compRect.left - trackRect.left;
+
+    widths = allItems.map((el) => el.getBoundingClientRect().width);
+
+    naturalLefts = allItems.map((el) => el.getBoundingClientRect().left - trackRect.left);
+
+    // Prefer the real pixel gap between the first two siblings (matches flex
+    // layout in Safari/WebKit regardless of which longhand Webflow emitted).
+    if (allItems.length >= 2) {
+      const a = allItems[0].getBoundingClientRect();
+      const b = allItems[1].getBoundingClientRect();
+      const measured = Math.max(0, b.left - a.right);
+      gap = measured > 0.5 ? measured : parsedGap;
+    } else {
+      gap = parsedGap;
+    }
+
+    logoGap = Number.isFinite(logoGapAttr) ? logoGapAttr : gap;
+
     const logoRect = logo.getBoundingClientRect();
     logoWidth = logoRect.width;
 
-    // Each item's natural left position in the flex layout (cumulative).
-    // translateX values are computed as (target - naturalLeft).
-    widths = allItems.map((el) => el.getBoundingClientRect().width);
-
-    naturalLefts = [];
-    let cumulative = 0;
-    widths.forEach((w, i) => {
-      naturalLefts[i] = cumulative;
-      cumulative += w + gap;
-    });
+    // SVG-aspect-ratio quirks: if the box reports ~0 width, fall back.
+    if (logoWidth < 1) {
+      logoWidth = logo.offsetWidth || logo.clientWidth || 0;
+    }
+    const svg = logo.querySelector('svg');
+    if (svg && logoWidth < 1) {
+      logoWidth = svg.getBoundingClientRect().width || 0;
+    }
   }
 
   function computeTargets(activeIdx) {
@@ -188,7 +222,7 @@ function setupComponent(component) {
       gsap.to(logo, { x: logoLeft, duration, ease: pushEase });
       allItems.forEach((el, i) => {
         gsap.to(el, {
-          x: targets[i] - naturalLefts[i],
+          x: targets[i] - naturalLefts[i] + trackOffsetX,
           duration,
           ease: pushEase,
         });
@@ -196,7 +230,7 @@ function setupComponent(component) {
     } else {
       gsap.set(logo, { x: logoLeft });
       allItems.forEach((el, i) => {
-        gsap.set(el, { x: targets[i] - naturalLefts[i] });
+        gsap.set(el, { x: targets[i] - naturalLefts[i] + trackOffsetX });
       });
     }
   }
