@@ -176,7 +176,6 @@ function setupComponent(component) {
     const logoRect = logo.getBoundingClientRect();
     logoWidth = logoRect.width;
 
-    // SVG-aspect-ratio quirks: if the box reports ~0 width, fall back.
     if (logoWidth < 1) {
       logoWidth = logo.offsetWidth || logo.clientWidth || 0;
     }
