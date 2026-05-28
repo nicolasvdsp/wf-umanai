@@ -38,6 +38,46 @@ function initBunnyLightboxPlayer(container) {
   var initialMuted = player.getAttribute('data-player-muted') === 'true';
 
   var pendingPlay = false;
+  var hasFailed = false;
+  var stallTimer = null;
+  var STALL_MS = 15000;
+
+  function clearStallTimer() {
+    if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
+  }
+
+  function startStallTimer() {
+    clearStallTimer();
+    if (hasFailed) return;
+    stallTimer = setTimeout(function () {
+      if (hasFailed) return;
+      if (player.getAttribute('data-player-status') === 'loading') handleError();
+    }, STALL_MS);
+  }
+
+  function handleError() {
+    if (hasFailed) return;
+    hasFailed = true;
+    pendingPlay = false;
+    autoStartOnReady = false;
+    clearStallTimer();
+    try { video.pause(); } catch (_) { }
+    if (player._hls) { try { player._hls.destroy(); } catch (_) { } player._hls = null; }
+    setActivated(false);
+    setStatus('error');
+    if (wrapper.getAttribute('data-bunny-lightbox-status') === 'active') closeLightbox();
+  }
+
+  function wireHlsErrors(hls) {
+    if (!hls || !window.Hls) return;
+    hls.on(Hls.Events.ERROR, function (event, data) {
+      if (data && data.fatal) handleError();
+    });
+  }
+
+  function onLoadProgress() {
+    clearStallTimer();
+  }
 
   video.loop = false;
   setMutedState(initialMuted);
@@ -163,10 +203,14 @@ function initBunnyLightboxPlayer(container) {
     }
     if (canUseHlsJs) {
       var hls = new Hls({ maxBufferLength: 10 });
+      wireHlsErrors(hls);
       player._hls = hls;
       hls.attachMedia(video);
       hls.on(Hls.Events.MEDIA_ATTACHED, function () { hls.loadSource(src); });
-      hls.on(Hls.Events.MANIFEST_PARSED, function () { onReady(); });
+      hls.on(Hls.Events.MANIFEST_PARSED, function () {
+        onLoadProgress();
+        onReady();
+      });
       hls.on(Hls.Events.LEVEL_LOADED, function (e, data) {
         if (data && data.details && isFinite(data.details.totalduration) && timeDurationEls.length) {
           setText(timeDurationEls, formatTime(data.details.totalduration));
@@ -188,6 +232,7 @@ function initBunnyLightboxPlayer(container) {
     isAttached = true;
 
     withAttach(src, function onReady() {
+      onLoadProgress();
       readyIfIdle(player, pendingPlay);
       updateBeforeRatioIOSSafe();
       if (typeof player._applyClamp === 'function') player._applyClamp();
@@ -195,6 +240,7 @@ function initBunnyLightboxPlayer(container) {
 
       if (autoStartOnReady && wrapper.getAttribute('data-bunny-lightbox-status') === 'active') {
         setStatus('loading');
+        startStallTimer();
         safePlay(video);
         autoStartOnReady = false;
       }
@@ -214,6 +260,8 @@ function initBunnyLightboxPlayer(container) {
   function planOnOpen(next) {
     var same = isSameSrc(next);
     if (!same) {
+      hasFailed = false;
+      clearStallTimer();
       try { if (!video.paused && !video.ended) video.pause(); } catch (_) { }
       if (player._hls) { try { player._hls.destroy(); } catch (_) { } player._hls = null; }
       isAttached = false; currentSrc = '';
@@ -229,6 +277,7 @@ function initBunnyLightboxPlayer(container) {
     autoStartOnReady = !!autoplay;
     if (autoplay) {
       setStatus('loading');
+      startStallTimer();
       safePlay(video);
     } else {
       try { if (!video.paused && !video.ended) video.pause(); } catch (_) { }
@@ -240,6 +289,7 @@ function initBunnyLightboxPlayer(container) {
   // Open/Close API
   function openLightbox(src, placeholderUrl) {
     if (!src) return;
+    hasFailed = false;
 
     function activate() {
       ensureOpenUI(true);
@@ -262,10 +312,12 @@ function initBunnyLightboxPlayer(container) {
   }
 
   function togglePlay() {
+    if (hasFailed) return;
     if (video.paused || video.ended) {
       pendingPlay = true;
       lastPauseBy = '';
       setStatus('loading');
+      startStallTimer();
       safePlay(video);
     } else {
       lastPauseBy = 'manual';
@@ -274,7 +326,11 @@ function initBunnyLightboxPlayer(container) {
   }
   function toggleMute() { setMutedState(!video.muted); }
 
+  video.addEventListener('error', handleError);
+  video.addEventListener('loadedmetadata', onLoadProgress);
+
   player.addEventListener('click', function (e) {
+    if (hasFailed) return;
     var btn = e.target.closest('[data-player-control]');
     if (!btn || !player.contains(btn)) return;
     var type = btn.getAttribute('data-player-control');
@@ -337,11 +393,15 @@ function initBunnyLightboxPlayer(container) {
   video.addEventListener('durationchange', updateBufferedBar);
 
   // Media event wiring
-  video.addEventListener('play', function () { setActivated(true); cancelAnimationFrame(rafId); loop(); setStatus('playing'); });
-  video.addEventListener('playing', function () { pendingPlay = false; setStatus('playing'); });
-  video.addEventListener('pause', function () { pendingPlay = false; cancelAnimationFrame(rafId); updateProgressVisuals(); setStatus('paused'); });
-  video.addEventListener('waiting', function () { setStatus('loading'); });
-  video.addEventListener('canplay', function () { readyIfIdle(player, pendingPlay); });
+  video.addEventListener('play', function () { if (hasFailed) return; setActivated(true); cancelAnimationFrame(rafId); loop(); setStatus('playing'); });
+  video.addEventListener('playing', function () { if (hasFailed) return; pendingPlay = false; clearStallTimer(); setStatus('playing'); });
+  video.addEventListener('pause', function () { if (hasFailed) return; pendingPlay = false; cancelAnimationFrame(rafId); updateProgressVisuals(); setStatus('paused'); });
+  video.addEventListener('waiting', function () { if (hasFailed) return; setStatus('loading'); startStallTimer(); });
+  video.addEventListener('canplay', function () {
+    if (hasFailed) return;
+    onLoadProgress();
+    readyIfIdle(player, pendingPlay);
+  });
 
   // Video ended
   video.addEventListener('ended', function () {
@@ -451,7 +511,7 @@ function initBunnyLightboxPlayer(container) {
     try { if (!video.paused && !video.ended) video.pause(); } catch (_) { }
 
     setActivated(false);
-    setStatus(hasPlayed ? 'paused' : 'idle');
+    if (!hasFailed) setStatus(hasPlayed ? 'paused' : 'idle');
   }
 
   // Global open/close controls + ESC
@@ -500,6 +560,7 @@ function initBunnyLightboxPlayer(container) {
 
   // Helper: Ready status guard
   function readyIfIdle(player, pendingPlay) {
+    if (player.getAttribute('data-player-status') === 'error') return;
     if (!pendingPlay &&
       player.getAttribute('data-player-activated') !== 'true' &&
       player.getAttribute('data-player-status') === 'idle') {

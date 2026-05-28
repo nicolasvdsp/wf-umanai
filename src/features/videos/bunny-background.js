@@ -27,6 +27,44 @@ function initBunnyPlayerBackground(container) {
 
     // Used to suppress 'ready' flicker when user just pressed play in lazy modes
     var pendingPlay = false;
+    var hasFailed = false;
+    var stallTimer = null;
+    var STALL_MS = 15000;
+
+    function clearStallTimer() {
+      if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
+    }
+
+    function startStallTimer() {
+      clearStallTimer();
+      if (hasFailed) return;
+      stallTimer = setTimeout(function () {
+        if (hasFailed) return;
+        if (player.getAttribute('data-player-status') === 'loading') handleError();
+      }, STALL_MS);
+    }
+
+    function handleError() {
+      if (hasFailed) return;
+      hasFailed = true;
+      pendingPlay = false;
+      clearStallTimer();
+      try { video.pause(); } catch (_) { }
+      if (player._hls) { try { player._hls.destroy(); } catch (_) { } player._hls = null; }
+      setActivated(false);
+      setStatus('error');
+    }
+
+    function wireHlsErrors(hls) {
+      if (!hls || !window.Hls) return;
+      hls.on(Hls.Events.ERROR, function (event, data) {
+        if (data && data.fatal) handleError();
+      });
+    }
+
+    function onLoadProgress() {
+      clearStallTimer();
+    }
 
     // Autoplay forces muted + loop; IO will drive play/pause
     if (autoplay) { video.muted = true; video.loop = true; }
@@ -56,13 +94,16 @@ function initBunnyPlayerBackground(container) {
         video.preload = isLazyTrue ? 'none' : 'auto';
         video.src = src;
         video.addEventListener('loadedmetadata', function () {
+          onLoadProgress();
           readyIfIdle(player, pendingPlay);
         }, { once: true });
       } else if (canUseHlsJs) {
         var hls = new Hls({ maxBufferLength: 10 });
+        wireHlsErrors(hls);
         hls.attachMedia(video);
         hls.on(Hls.Events.MEDIA_ATTACHED, function () { hls.loadSource(src); });
         hls.on(Hls.Events.MANIFEST_PARSED, function () {
+          onLoadProgress();
           readyIfIdle(player, pendingPlay);
         });
         player._hls = hls;
@@ -80,12 +121,14 @@ function initBunnyPlayerBackground(container) {
 
     // Toggle play/pause
     function togglePlay() {
+      if (hasFailed) return;
       userInteracted = true;
       if (video.paused || video.ended) {
         if (isLazyTrue && !isAttached) attachMediaOnce();
         pendingPlay = true;
         lastPauseBy = '';
         setStatus('loading');
+        startStallTimer();
         safePlay(video);
       } else {
         lastPauseBy = 'manual';
@@ -95,12 +138,17 @@ function initBunnyPlayerBackground(container) {
 
     // Toggle mute
     function toggleMute() {
+      if (hasFailed) return;
       video.muted = !video.muted;
       player.setAttribute('data-player-muted', video.muted ? 'true' : 'false');
     }
 
+    video.addEventListener('error', handleError);
+    video.addEventListener('loadedmetadata', onLoadProgress);
+
     // Controls (delegated)
     player.addEventListener('click', function (e) {
+      if (hasFailed) return;
       var btn = e.target.closest('[data-player-control]');
       if (!btn || !player.contains(btn)) return;
       var type = btn.getAttribute('data-player-control');
@@ -109,11 +157,15 @@ function initBunnyPlayerBackground(container) {
     });
 
     // Media event wiring
-    video.addEventListener('play', function () { setActivated(true); setStatus('playing'); });
-    video.addEventListener('playing', function () { pendingPlay = false; setStatus('playing'); });
-    video.addEventListener('pause', function () { pendingPlay = false; setStatus('paused'); });
-    video.addEventListener('waiting', function () { setStatus('loading'); });
-    video.addEventListener('canplay', function () { readyIfIdle(player, pendingPlay); });
+    video.addEventListener('play', function () { if (hasFailed) return; setActivated(true); setStatus('playing'); });
+    video.addEventListener('playing', function () { if (hasFailed) return; pendingPlay = false; clearStallTimer(); setStatus('playing'); });
+    video.addEventListener('pause', function () { if (hasFailed) return; pendingPlay = false; setStatus('paused'); });
+    video.addEventListener('waiting', function () { if (hasFailed) return; setStatus('loading'); startStallTimer(); });
+    video.addEventListener('canplay', function () {
+      if (hasFailed) return;
+      onLoadProgress();
+      readyIfIdle(player, pendingPlay);
+    });
     video.addEventListener('ended', function () { pendingPlay = false; setStatus('paused'); setActivated(false); });
 
     // In-view auto play/pause (only when autoplay is true)
@@ -121,11 +173,13 @@ function initBunnyPlayerBackground(container) {
       if (player._io) { try { player._io.disconnect(); } catch (_) { } }
       var io = new IntersectionObserver(function (entries) {
         entries.forEach(function (entry) {
+          if (hasFailed) return;
           var inView = entry.isIntersecting && entry.intersectionRatio > 0;
           if (inView) {
             if (isLazyTrue && !isAttached) attachMediaOnce();
             if ((lastPauseBy === 'io') || (video.paused && lastPauseBy !== 'manual')) {
               setStatus('loading');
+              startStallTimer();
               if (video.paused) togglePlay();
               lastPauseBy = '';
             }
@@ -144,6 +198,7 @@ function initBunnyPlayerBackground(container) {
 
   // Helper: Ready status guard
   function readyIfIdle(player, pendingPlay) {
+    if (player.getAttribute('data-player-status') === 'error') return;
     if (!pendingPlay &&
       player.getAttribute('data-player-activated') !== 'true' &&
       player.getAttribute('data-player-status') === 'idle') {
