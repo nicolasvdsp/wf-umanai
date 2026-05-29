@@ -24,6 +24,7 @@ function initBunnyPlayerBackground(container) {
     var isLazyTrue = lazyMode === 'true';
     var autoplay = player.getAttribute('data-player-autoplay') === 'true';
     var initialMuted = player.getAttribute('data-player-muted') === 'true';
+    var maxQuality = player.getAttribute('data-player-max-quality') === 'true';
 
     // Used to suppress 'ready' flicker when user just pressed play in lazy modes
     var pendingPlay = false;
@@ -62,6 +63,88 @@ function initBunnyPlayerBackground(container) {
       });
     }
 
+    function bestLevelIndex(levels) {
+      if (!levels || !levels.length) return -1;
+      var bestIdx = 0;
+      var bestScore = -1;
+      for (var i = 0; i < levels.length; i++) {
+        var l = levels[i] || {};
+        var score = (l.height || 0) * 1e7 + (l.bitrate || 0);
+        if (score > bestScore) { bestScore = score; bestIdx = i; }
+      }
+      return bestIdx;
+    }
+
+    function wireMaxQuality(hls) {
+      if (!maxQuality || !window.Hls) return;
+      hls.on(Hls.Events.MANIFEST_LOADED, function (e, data) {
+        if (data && data.levels && data.levels.length > 1) {
+          hls.startLevel = bestLevelIndex(data.levels);
+        }
+      });
+      hls.on(Hls.Events.MANIFEST_PARSED, function () {
+        if (hls.levels && hls.levels.length > 1) {
+          var max = bestLevelIndex(hls.levels);
+          hls.autoLevelCapping = max;
+          hls.nextLevel = max;
+          hls.loadLevel = max;
+          hls.currentLevel = max;
+        }
+      });
+    }
+
+    // Safari (native HLS) has no hls.js APIs. To force max quality we resolve
+    // the master playlist, pick the highest-bitrate variant, and point the
+    // <video> directly at that single-rendition sub-playlist.
+    function resolveMaxQualityVariant(masterUrl, done) {
+      fetch(masterUrl, { credentials: 'omit' })
+        .then(function (r) { if (!r.ok) throw new Error(); return r.text(); })
+        .then(function (txt) {
+          var lines = txt.split(/\r?\n/);
+          var bestBw = 0;
+          var bestUri = null;
+          var lastInf = null;
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (line.indexOf('#EXT-X-STREAM-INF:') === 0) {
+              lastInf = line;
+            } else if (lastInf && line && line[0] !== '#') {
+              var bw = 0;
+              var bwMatch = /BANDWIDTH=(\d+)/.exec(lastInf);
+              if (bwMatch) bw = parseInt(bwMatch[1], 10) || 0;
+              if (bw > bestBw) { bestBw = bw; bestUri = line; }
+              lastInf = null;
+            }
+          }
+          if (bestUri) done(new URL(bestUri, masterUrl).href);
+          else done(masterUrl);
+        })
+        .catch(function () { done(masterUrl); });
+    }
+
+    function wireLoopStartFlush(hls) {
+      if (!video.loop || !hls || !window.Hls) return;
+      var loopFlushDone = false;
+      var LOOP_FLUSH_LEAD = 1.5;
+
+      video.addEventListener('timeupdate', function () {
+        if (hasFailed || !video.duration || !player._hls) return;
+        var remaining = video.duration - video.currentTime;
+        if (remaining <= LOOP_FLUSH_LEAD && remaining > 0 && !loopFlushDone) {
+          loopFlushDone = true;
+          var flushEnd = Math.min(3, video.duration * 0.15);
+          if (flushEnd > 0) {
+            hls.trigger(Hls.Events.BUFFER_FLUSHING, {
+              startOffset: 0,
+              endOffset: flushEnd,
+              type: 'video',
+            });
+          }
+        }
+        if (video.currentTime < 0.5) loopFlushDone = false;
+      });
+    }
+
     function onLoadProgress() {
       clearStallTimer();
     }
@@ -92,14 +175,20 @@ function initBunnyPlayerBackground(container) {
 
       if (isSafariNative) {
         video.preload = isLazyTrue ? 'none' : 'auto';
-        video.src = src;
         video.addEventListener('loadedmetadata', function () {
           onLoadProgress();
           readyIfIdle(player, pendingPlay);
         }, { once: true });
+        if (maxQuality) {
+          resolveMaxQualityVariant(src, function (resolved) { video.src = resolved; });
+        } else {
+          video.src = src;
+        }
       } else if (canUseHlsJs) {
         var hls = new Hls({ maxBufferLength: 10 });
         wireHlsErrors(hls);
+        wireMaxQuality(hls);
+        wireLoopStartFlush(hls);
         hls.attachMedia(video);
         hls.on(Hls.Events.MEDIA_ATTACHED, function () { hls.loadSource(src); });
         hls.on(Hls.Events.MANIFEST_PARSED, function () {
