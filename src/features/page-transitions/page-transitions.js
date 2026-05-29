@@ -784,7 +784,7 @@ function initPageTransitions() {
     preventRunning: true,
     prevent: ({ el }) => {
       if (el?.hash && el.pathname.replace(/\/$/, '') === window.location.pathname.replace(/\/$/, '')) return true;
-      return !!el?.closest('[fs-cmsfilter-clear], [fs-cmsfilter-element], [fs-cmssort-element], [fs-cmsfilter-field], [fs-list-element], .w-pagination-next, .w-pagination-previous, .w-pagination-wrapper');
+      return !!el?.closest('[fs-cmsfilter-clear], [fs-cmsfilter-element], [fs-cmssort-element], [fs-cmsfilter-field], [fs-list-element], [fs-list-field], [fs-list-value], .w-pagination-next, .w-pagination-previous, .w-pagination-wrapper');
     },
     transitions: [
       { //item to detail page
