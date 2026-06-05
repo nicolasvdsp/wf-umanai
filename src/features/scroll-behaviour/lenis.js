@@ -46,8 +46,9 @@ function initScrollToAnchorLenis(container) {
       const target = this.getAttribute('data-anchor-target');
       if (!window.lenis) return;
 
+      const extra = parseFloat(this.getAttribute('data-anchor-offset')) || 0;
       e.preventDefault();
-      window.lenis.scrollTo(target, { ...SCROLL_OPTS, offset: getOffset() });
+      window.lenis.scrollTo(target, { ...SCROLL_OPTS, offset: getOffset() + extra });
     });
   });
 }
